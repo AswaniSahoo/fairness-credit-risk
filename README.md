@@ -87,3 +87,75 @@ python test_api.py
 
 # Access Swagger UI
 open http://localhost:8000/docs
+
+
+🔬 Methodology
+Phase 1: Bias Detection
+Protected attributes identified: gender, age, foreign_worker
+Initial Disparate Impact: 0.897 (borderline)
+7.5% approval gap between genders detected
+Phase 2: Fairness Mitigation
+Pre-processing: AIF360 Reweighing (sample weights: 0.855-1.082)
+In-processing: class_weight='balanced' for imbalance
+Post-processing: Threshold optimization (attempted)
+Phase 3: AutoML Optimization
+Models tested: Random Forest, XGBoost, LightGBM, Logistic Regression
+Trials: 50 (Optuna TPE sampler)
+Objective: Composite score (70% performance + 30% fairness)
+Winner: Random Forest (0.634 composite score)
+Phase 4: Deployment
+FastAPI REST API with Pydantic validation
+Docker containerization with health checks
+Automatic fairness adjustment via threshold optimizer
+
+📈 Model Performance
+Confusion Matrix (Test Set):
+
+text
+
+                Predicted
+              Good | Bad
+Actual Good    133 |  28
+       Bad      12 |  75
+Key Insights:
+
+Precision: 53.7% (of predicted defaults, 53.7% actually defaulted)
+Recall: 71.7% (caught 71.7% of actual defaults)
+Trade-off: Model prioritizes catching defaults (high recall) over precision
+⚖️ Fairness Analysis
+Disparate Impact by Gender:
+
+Male approval rate: 73.4%
+Female approval rate: 65.3%
+Disparate Impact: 0.890 ✅ (above 0.8 legal threshold)
+Limitations:
+
+Equal Opportunity metric (-0.225) outside ideal range
+Future work: Calibration methods, more balanced training data
+
+🛠️ Technologies Used
+Category	Technology
+ML Framework	scikit-learn, XGBoost, LightGBM
+Fairness	AIF360 (IBM)
+AutoML	Optuna
+API	FastAPI, Pydantic
+Deployment	Docker, Docker Compose
+Monitoring	Logging, Health Checks
+📚 Dataset
+German Credit Dataset (UCI ML Repository)
+
+1,000 loan applications
+20 features (7 numerical, 13 categorical)
+70% good credit, 30% default
+Protected attributes: gender, age, foreign worker status
+🔮 Future Improvements
+Fairness: Adversarial debiasing, calibration
+Performance: Ensemble methods, feature engineering
+Deployment: Kubernetes, A/B testing, model monitoring
+Explainability: SHAP integration for loan decisions
+Data: Active learning for underrepresented groups
+📖 References
+AIF360 Documentation
+Fairlearn
+German Credit Dataset
+Optuna
