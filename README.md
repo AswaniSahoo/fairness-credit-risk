@@ -111,12 +111,12 @@ Automatic fairness adjustment via threshold optimizer
 📈 Model Performance
 Confusion Matrix (Test Set):
 
-text
-
+```
                 Predicted
               Good | Bad
 Actual Good    133 |  28
        Bad      12 |  75
+```
 Key Insights:
 
 Precision: 53.7% (of predicted defaults, 53.7% actually defaulted)
@@ -155,7 +155,7 @@ Deployment: Kubernetes, A/B testing, model monitoring
 Explainability: SHAP integration for loan decisions
 Data: Active learning for underrepresented groups
 📖 References
-AIF360 Documentation
+AIF360 Documentation(https://aif360.readthedocs.io/en/stable/)
 Fairlearn
 German Credit Dataset
 Optuna
