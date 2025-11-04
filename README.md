@@ -87,7 +87,7 @@ python test_api.py
 
 # Access Swagger UI
 open http://localhost:8000/docs
-
+```
 
 🔬 Methodology
 Phase 1: Bias Detection
