@@ -1,0 +1,36 @@
+{
+    "best_model_type": "random_forest",
+    "best_parameters": {
+        "model_type": "random_forest",
+        "rf_n_estimators": 488,
+        "rf_max_depth": 20,
+        "rf_min_samples_split": 20,
+        "rf_min_samples_leaf": 8
+    },
+    "composite_score": 0.7848237494156147,
+    "performance_metrics": {
+        "accuracy": 0.73,
+        "balanced_accuracy": 0.7261904761904763,
+        "precision": 0.5375,
+        "recall": 0.7166666666666667,
+        "f1_score": 0.6142857142857143,
+        "roc_auc": 0.8395238095238096,
+        "average_precision": 0.7186242215808645
+    },
+    "fairness_metrics": {
+        "disparate_impact": 0.8903225806451612,
+        "statistical_parity_difference": -0.07947639083683966,
+        "equal_opportunity_difference": -0.2250000000000001
+    },
+    "total_trials": 50,
+    "data_shape": {
+        "train": [
+            800,
+            18
+        ],
+        "test": [
+            200,
+            18
+        ]
+    }
+}

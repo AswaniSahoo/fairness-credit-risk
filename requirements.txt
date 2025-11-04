@@ -1,0 +1,29 @@
+# AutoML GPU Environment (Python 3.10, CUDA 11.8+)
+
+# Core Data Handling
+numpy==1.24.3
+pandas==1.5.3
+scipy==1.10.1
+
+# Machine Learning & AutoML Core (GPU-enabled)
+xgboost==1.7.5
+lightgbm==3.3.5
+scikit-learn==1.2.2
+
+# Hyperparameter Tuning
+optuna==3.1.1
+
+# Fairness & Explainability
+fairlearn==0.7.0
+aif360==0.5.0
+shap==0.41.0
+
+# Visualization
+matplotlib==3.7.1
+seaborn==0.12.2
+
+# Web App/API
+flask==2.3.2
+
+# Optional CUDA Toolkit (for GPU acceleration)
+# You can install via conda: conda install -c conda-forge cudatoolkit=11.8
