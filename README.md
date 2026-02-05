@@ -5,7 +5,10 @@
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](https://www.docker.com/)
+[![Streamlit](https://img.shields.io/badge/🤗_Demo-Streamlit-FF4B4B.svg)](https://huggingface.co/spaces/AswaniSahoo/fairness-credit-risk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> **🚀 [Try the Live Demo](https://huggingface.co/spaces/AswaniSahoo/fairness-credit-risk)** | **📓 [Jupyter Notebook Walkthrough](notebooks/fairness_credit_risk_walkthrough.ipynb)**
 
 ---
 
