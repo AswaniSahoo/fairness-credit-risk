@@ -89,7 +89,7 @@ model, preprocessor, threshold_optimizer, model_loaded = load_model()
 
 # Header
 st.markdown('<p class="main-header">🏦 Fairness-Aware Credit Risk Scoring</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">AutoML-Optimized Model with Bias Mitigation | GSoC 2026 Portfolio Project</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">AutoML-Optimized Model with Bias Mitigation</p>', unsafe_allow_html=True)
 
 # Sidebar - Model Information
 with st.sidebar:
@@ -214,14 +214,12 @@ if model_loaded:
             'other_debtors': other_debtors_map[other_debtors],
             'present_residence': present_residence,
             'property': property_map[property_type],
-            'age': age,
             'other_installment_plans': other_plans_map[other_plans],
             'housing': housing_map[housing],
             'number_credits': number_credits,
             'job': job_map[job],
             'people_liable': people_liable,
             'telephone': 1 if telephone == "Yes" else 0,
-            'foreign_worker': 1 if foreign_worker == "Yes" else 0,
         }
         
         # Create DataFrame
@@ -297,6 +295,6 @@ st.markdown("""
 <div style="text-align: center; color: #666; font-size: 0.9rem;">
     <p>Built with ❤️ by <a href="https://github.com/AswaniSahoo" target="_blank">Aswani Sahoo</a> | 
     <a href="https://github.com/AswaniSahoo/fairness-credit-risk" target="_blank">View on GitHub</a></p>
-    <p>GSoC 2026 Portfolio Project | Fairness-Aware Machine Learning</p>
+    <p>Fairness-Aware Machine Learning</p>
 </div>
 """, unsafe_allow_html=True)

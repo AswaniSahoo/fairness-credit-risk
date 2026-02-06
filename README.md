@@ -33,6 +33,21 @@ This project implements an **end-to-end fairness-aware machine learning pipeline
 | **Disparate Impact** | 0.890 | Legal (>0.8) |
 | **Statistical Parity** | -0.079 | Fair (±0.1) |
 
+---
+
+## 🚀 Live Demo
+
+**Try the interactive demo:** [https://huggingface.co/spaces/AswaniSahoo/fairness-credit-risk](https://huggingface.co/spaces/AswaniSahoo/fairness-credit-risk)
+
+![Live Demo](screenshots/live_demo.png)
+
+The demo allows you to:
+- Input applicant information (personal, financial, credit history)
+- Get real-time credit risk predictions
+- View probability scores and fairness assurance
+
+---
+
 ### Model Performance Comparison
 
 ![Model Comparison](screenshots/model_comparison.png)
