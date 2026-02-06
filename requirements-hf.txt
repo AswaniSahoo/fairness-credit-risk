@@ -1,6 +1,0 @@
-# Requirements for Hugging Face Spaces
-streamlit
-pandas
-numpy
-scikit-learn
-joblib
