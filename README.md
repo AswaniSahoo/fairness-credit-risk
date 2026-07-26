@@ -1,309 +1,241 @@
-# Fairness-Aware AutoML for Credit Risk Scoring
+# Fairness-Aware Credit Risk Scoring
 
-**A production-ready, bias-mitigating credit risk prediction system with automated model selection and REST API deployment.**
+Four fairness interventions, measured against a tuned baseline under identical conditions, on
+two datasets. The interesting result is that none of them helped much, and the reasons why are
+different for each.
 
-[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green.svg)](https://fastapi.tiangolo.com/)
-[![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](https://www.docker.com/)
-[![Streamlit](https://img.shields.io/badge/🤗_Demo-Streamlit-FF4B4B.svg)](https://huggingface.co/spaces/AswaniSahoo/fairness-credit-risk)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://img.shields.io/badge/tests-165%20passing-green.svg)](tests/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **🚀 [Try the Live Demo](https://huggingface.co/spaces/AswaniSahoo/fairness-credit-risk)** | **📓 [Jupyter Notebook Walkthrough](notebooks/fairness_credit_risk_walkthrough.ipynb)**
-
----
-
-## Project Overview
-
-This project implements an **end-to-end fairness-aware machine learning pipeline** for credit risk assessment. It addresses critical challenges in financial AI:
-
-- **Class Imbalance** (70-30 split): Handled via `class_weight='balanced'`
-- **Algorithmic Bias**: Mitigated using AIF360 reweighting
-- **Model Selection**: Automated hyperparameter tuning with Optuna (50 trials)
-- **Legal Compliance**: Disparate Impact > 0.8 (80% rule)
+Every number in this README is generated from [`reports/track_comparison.json`](reports/track_comparison.json)
+by [`scripts/generate_report_assets.py`](scripts/generate_report_assets.py). None is typed by
+hand. An earlier version of this project published a comparison chart whose values appear in no
+artifact at all, which is why that rule now exists and is enforced by a test.
 
 ---
 
-## Key Results
+## What this measures
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| **ROC-AUC** | 0.840 | Excellent |
-| **Balanced Accuracy** | 0.726 | Good |
-| **F1-Score** | 0.614 | Solid |
-| **Disparate Impact** | 0.890 | Legal (>0.8) |
-| **Statistical Parity** | -0.079 | Fair (±0.1) |
+A credit risk model can be unfair in ways that a single accuracy number hides. The standard
+remedies act at three different stages, and the literature reports them working. This project
+implements four tracks that differ **only** in the intervention, and measures what each one
+actually buys.
 
----
+| Track | Intervention | Stage | Deployable |
+|---|---|---|---|
+| T0 | none | control | yes |
+| T1 | Kamiran-Calders reweighing, recomputed per fold | pre-processing | yes |
+| T2 | fairlearn `ExponentiatedGradient`, demographic parity | in-processing | yes, with caveats |
+| T3 | group-specific decision thresholds | post-processing | **no** |
 
-## 🚀 Live Demo
+T3 is measured and reported but marked not deployable: keying a credit decision on the
+applicant's sex is disparate treatment under ECOA and Regulation B whatever it does to a
+fairness metric. It is included because this project originally shipped exactly that rule
+behind its API, and documenting why it was removed is more useful than deleting it silently.
 
-**Try the interactive demo:** [https://huggingface.co/spaces/AswaniSahoo/fairness-credit-risk](https://huggingface.co/spaces/AswaniSahoo/fairness-credit-risk)
-
-![Live Demo](screenshots/live_demo.png)
-
-The demo allows you to:
-- Input applicant information (personal, financial, credit history)
-- Get real-time credit risk predictions
-- View probability scores and fairness assurance
-
----
-
-### Model Performance Comparison
-
-![Model Comparison](screenshots/model_comparison.png)
+Comparability is structural, not aspirational. All tracks share one seeded, fingerprinted
+split artifact, one encoder, one metric implementation, and one set of bootstrap replicates.
 
 ---
 
-## Fairness Metrics Explained
+## Results
 
-This project evaluates model fairness using three key metrics:
+### German Credit (1,000 rows, 200-row test block, 62 women in it)
 
-### Disparate Impact (80% Rule)
+<!-- generated from reports/tables/track_comparison_german_credit.md -->
 
-The ratio of favorable outcomes between unprivileged and privileged groups. A value ≥ 0.8 indicates legal compliance.
+| Track | Intervention | Stage | Deployable | ROC-AUC | Balanced Accuracy | Disparate Impact | Stat. Parity Diff. |
+|---|---|---|---|---|---|---|---|
+| T0 | none | control | yes | 0.8296 [0.7725, 0.8804] | 0.7357 [0.6679, 0.7988] | 0.7263 [0.5342, 0.9106] | -0.1884 [-0.3319, -0.0570] |
+| T1 | Kamiran-Calders reweighing | pre-processing | yes | 0.8298 [0.7733, 0.8819] | 0.7143 [0.6464, 0.7774] | 0.6774 [0.4848, 0.8793] | -0.2151 [-0.3537, -0.0755] |
+| T2 | ExponentiatedGradient, demographic parity | in-processing | yes | 0.7357 [0.6679, 0.7988] [*] | 0.7357 [0.6679, 0.7988] | 0.7263 [0.5342, 0.9106] | -0.1884 [-0.3319, -0.0570] |
+| T3 | group-specific thresholds | post-processing | no | 0.8296 [0.7725, 0.8804] | 0.7333 [0.6738, 0.7881] | 0.6583 [0.4336, 0.9032] | -0.1758 [-0.3055, -0.0483] |
 
-```
-Disparate Impact = P(Approved | Female) / P(Approved | Male)
-Our Result: 0.890 (PASS)
-```
+[*] T2 emits a decision, not a graded score. Its ROC-AUC equals its balanced accuracy by
+construction, so it is not comparable with the other tracks' ranking quality.
 
-### Statistical Parity Difference
+![Fairness-accuracy tradeoff, German Credit](reports/figures/tradeoff_german_credit.png)
 
-The difference in approval rates between groups. Should be within ±0.1 for fairness.
+**No intervention improved fairness.** T1 made disparate impact worse (0.6774 against 0.7263)
+and cost balanced accuracy. T3 also made it worse. T2 left the predictions untouched. Every
+interval spans the 0.8 four-fifths line, so on this dataset none of these differences is
+distinguishable from noise in the first place.
 
-```
-SPD = P(Approved | Female) - P(Approved | Male)
-Our Result: -0.079 (PASS)
-```
+### Taiwan credit default (30,000 rows, 6,000-row test block, 3,622 women and 2,378 men in it)
 
-### Equal Opportunity Difference
+<!-- generated from reports/tables/track_comparison_taiwan_credit.md -->
 
-The difference in true positive rates for the favorable outcome. Measures if qualified applicants from both groups have equal chances.
+| Track | Intervention | Stage | Deployable | ROC-AUC | Balanced Accuracy | Disparate Impact | Stat. Parity Diff. |
+|---|---|---|---|---|---|---|---|
+| T0 | none | control | yes | 0.7902 [0.7755, 0.8037] | 0.6629 [0.6500, 0.6756] | 0.9767 [0.9594, 0.9934] | -0.0209 [-0.0366, -0.0060] |
+| T1 | Kamiran-Calders reweighing | pre-processing | yes | 0.7898 [0.7754, 0.8032] | 0.6625 [0.6494, 0.6756] | 0.9779 [0.9615, 0.9940] | -0.0198 [-0.0348, -0.0054] |
+| T2 | ExponentiatedGradient, demographic parity | in-processing | yes | 0.6589 [0.6456, 0.6712] [*] | 0.6589 [0.6456, 0.6712] | 0.9800 [0.9636, 0.9961] | -0.0180 [-0.0327, -0.0035] |
+| T3 | group-specific thresholds | post-processing | no | 0.7902 [0.7755, 0.8037] | 0.7220 [0.7082, 0.7352] | 0.9425 [0.9137, 0.9712] | -0.0426 [-0.0649, -0.0210] |
 
-```
-EOD = TPR(Female) - TPR(Male)
-Our Result: -0.225 (Needs Improvement)
-```
+![Fairness-accuracy tradeoff, Taiwan](reports/figures/tradeoff_taiwan_credit.png)
 
-### Fairness Dashboard
-
-![Fairness Dashboard](screenshots/fairness_dashboard.png)
-
----
-
-## Bias Detection and Mitigation
-
-### Phase 1: Initial Bias Analysis
-
-Before building any models, comprehensive fairness analysis revealed:
-
-| Finding | Value |
-|---------|-------|
-| Gender approval gap | 7.5% (males: 72.4%, females: 64.9%) |
-| Intersectional variance | 27.4% across gender-age groups |
-| Disparate Impact | 0.897 (borderline legal) |
-| Default rate | 30% (class imbalance) |
-
-### Phase 2: Fairness Mitigation Applied
-
-| Technique | Stage | Description |
-|-----------|-------|-------------|
-| AIF360 Reweighting | Pre-processing | Sample weights (0.855-1.082) to balance representation |
-| class_weight='balanced' | In-processing | Adjust loss function for class imbalance |
-| Threshold Optimization | Post-processing | Group-specific thresholds for equal opportunity |
-
-### Before/After Comparison
-
-![Bias Mitigation Comparison](screenshots/bias_mitigation_comparison.png)
+Here the intervals are roughly ten times narrower, and the picture is clear rather than
+ambiguous: **the baseline already sits at disparate impact 0.9767**, so there is almost nothing
+to mitigate. T1 and T2 move it by less than 0.004. T3 makes it worse while improving balanced
+accuracy, because its real effect is to re-pick the operating point rather than to equalise
+anything.
 
 ---
 
-## Methodology
+## The finding worth taking away
 
-### Phase 1: Bias Detection
-- Protected attributes identified: gender, age, foreign_worker
-- Initial Disparate Impact: 0.897 (borderline)
-- 7.5% approval gap between genders detected
+Put the two datasets side by side:
 
-### Phase 2: Fairness Mitigation
-- Pre-processing: AIF360 Reweighing (sample weights: 0.855-1.082)
-- In-processing: `class_weight='balanced'` for imbalance
-- Post-processing: Threshold optimization (attempted)
+- German Credit has visible disparity (0.7263) and **62 women in its test block**. One flipped
+  prediction moves the female approval rate by 1.6 percentage points. Nothing can be
+  established there, in either direction.
+- Taiwan has 3,622 women and 2,378 men in its test block, enough power to resolve differences
+  of 0.02, and its baseline disparity is already inside the legal threshold with room to spare.
+  Note that the disadvantaged group there is **men**: women default less, so the ratio runs the
+  other way, which is why the privileged value lives in a per-dataset registry.
 
-### Phase 3: AutoML Optimization
-- Models tested: Random Forest, XGBoost, LightGBM, Logistic Regression
-- Trials: 50 (Optuna TPE sampler)
-- Objective: Composite score (70% performance + 30% fairness)
-- Winner: Random Forest (0.785 composite score)
-
-**Optimization History:**
-
-![AutoML Optimization History](screenshots/automl_optimization_history.png)
-
-### Phase 4: Deployment
-- FastAPI REST API with Pydantic validation
-- Docker containerization with health checks
-- Automatic fairness adjustment via threshold optimizer
+The dataset where fairness is measurable turns out not to need fixing, and the dataset that
+looks unfair cannot support any conclusion about whether it is. Most published fairness results
+on German Credit are three-decimal point estimates on a sample this size. That is the problem
+this repository is really about.
 
 ---
 
-## Model Performance
+## Three defects worth reading the code for
 
-### Confusion Matrix (Test Set)
+Each was found by auditing this project's own earlier version, and each is now pinned by a
+regression test that fails against the old behaviour.
 
-```
-                Predicted
-              Good | Bad
-Actual Good    133 |  28
-       Bad      12 |  75
-```
+**The fairness metrics never measured the model.** The previous implementation built an AIF360
+dataset with `label_name='true_label'` and put predictions in a separate column that AIF360
+never read, so disparate impact was computed from the ground-truth labels. Proof: feeding the
+labels in as predictions reproduces the previously published figures of 0.8903 and −0.0795 to
+four decimals. See [`src/evaluation/group_fairness.py`](src/evaluation/group_fairness.py) and
+`test_labels_as_predictions_recovers_the_dataset_bias_not_a_model_metric`.
 
-| Metric | Value | Interpretation |
-|--------|-------|----------------|
-| Precision | 53.7% | Of predicted defaults, 53.7% actually defaulted |
-| Recall | 71.7% | Caught 71.7% of actual defaults |
-| Trade-off | - | Model prioritizes catching defaults (high recall) over precision |
+**Model selection maximised the inverse of accuracy.** The Optuna objective read
+`predict_proba(...)[:, 0]`, the probability of *good* credit, and scored it against a target
+where 1 means default — returning `1 − AUC`. The search ranked models by which was worst for
+50 trials. See [`src/training/search.py`](src/training/search.py), where the positive class is
+named once and asserted against the fitted estimator's `classes_`.
+
+**Dropping `gender` did not remove sex from the model.** `personal_status_sex` code 1 is A92,
+the only female code present in German Credit, so it holds for exactly the 310 female rows and
+no male row. The regression test sweeps all 47 encoded columns and fails if any value of any
+column matches the female mask exactly.
+
+A fourth is subtler and only showed up while building T2. A demographic parity constraint is
+enforced on the data it is measured on, which is the training block. The tuned booster fits
+those rows closely enough that its **training-block parity gap is −0.0143, already inside the
+tightest constraint**, while its test-block gap is −0.1884. The reduction therefore had nothing
+to correct and returned the base learner unchanged at every constraint strength tried. The
+disparity is a generalisation gap, and an in-processing constraint cannot see it.
 
 ---
 
-## Project Structure
+## Design decisions
+
+**Protected attributes are excluded from the feature matrix, except age.** Sex and national
+origin are prohibited bases under ECOA and Regulation B. Age is different: Regulation B permits
+it in an empirically derived, demonstrably and statistically sound credit scoring system, so
+`age` is a feature and is still reported on. The distinction lives in data, in
+[`src/data/registry.py`](src/data/registry.py), not in prose, and the registry refuses to
+validate a specification that lists a prohibited basis as a feature.
+
+**One global threshold at inference.** No group-keyed thresholds; the serving layer refuses a
+prohibited-basis field as input rather than silently dropping it, so the contract stays legible.
+
+**The disparity direction is per-dataset.** German Credit encodes sex 0 female / 1 male with
+women approved less often; Taiwan encodes it 1 male / 2 female with men defaulting more. A
+global `PRIVILEGED_VALUE` constant is wrong for one of the two whatever value it holds.
+
+**Three-way split.** Models fit on train, post-processing fits on calibration, everything
+reported comes from test. The original code fitted its group thresholds on the training block's
+own probabilities, where a tree ensemble is close to memorising its training set.
+
+**Every metric carries a bootstrap interval**, resampled within (group, label) cells so a
+replicate cannot empty a group and make a rate undefined. Tracks share the same replicates, so
+comparisons are paired.
+
+---
+
+## Repository layout
 
 ```
-fairness-credit-risk/
-├── api/                    # REST API
-│   ├── main.py            # FastAPI application
-│   ├── schemas/           # Pydantic models
-│   └── utils/             # Model loader
-├── src/
-│   ├── preprocessing/     # Data processing
-│   ├── training/          # AutoML tuner
-│   ├── evaluation/        # Fairness metrics
-│   └── models/            # Model wrappers
-├── config/
-│   └── config.py          # Configuration
-├── artifacts/             # Saved models
-├── reports/               # Evaluation reports
-├── screenshots/           # Visualizations
-├── Dockerfile             # Container definition
-├── docker-compose.yml     # Orchestration
-└── requirements.txt       # Dependencies
+src/
+  data/registry.py        per-dataset column roles, protected directions, provenance
+  data/splits.py          the one seeded, fingerprinted three-way split
+  preprocessing/          registry-driven encoder, Kamiran-Calders reweighing
+  training/search.py      Optuna search over four model families
+  evaluation/             group fairness metrics, bootstrap intervals
+  pipelines/tracks.py     the four tracks, sharing one evaluation path
+  serving/predictor.py    the single inference path
+api/                      FastAPI service (no auth; see below)
+app.py                    Streamlit demo, calls the same predictor
+scripts/
+  run_comparison.py       runs the tracks and records results
+  generate_report_assets.py  produces every table and figure from the artifact
+  verify_german_encoding.py  recovers and checks the dataset's own encoding
+reports/track_comparison.json  the only permitted source of a published number
+MODEL_CARD.md             intended use, limitations, legal position
 ```
 
 ---
 
-## Quick Start
-
-### Run with Docker (Recommended)
+## Running it
 
 ```bash
-# Build and start the API
-docker-compose up --build -d
+python -m venv .venv && .venv/Scripts/activate      # Windows
+pip install -r requirements.txt -r requirements-dev.txt
 
-# Test the API
-python test_api.py
+pytest -m "unit or integration"                      # 165 tests
+python scripts/run_comparison.py --dataset german_credit
+python scripts/generate_report_assets.py
 
-# Access Swagger UI
-open http://localhost:8000/docs
+uvicorn api.main:app --reload                        # API at :8000/docs
+streamlit run app.py                                 # demo
 ```
 
-### Run Locally
+The defaults reproduce the published numbers: seed 42, 60 Optuna trials, 5-fold CV, 2,000
+bootstrap replicates. A full four-track run takes about four minutes on German Credit.
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run AutoML pipeline (training)
-python run_automl.py
-
-# Start API server
-uvicorn api.main:app --reload
-
-# Run tests
-python test_api.py
-```
+Docker: `docker-compose up --build -d`.
 
 ---
 
-## API Endpoints
+## Security
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | API health check |
-| `/predict` | POST | Credit risk prediction |
-| `/metrics` | GET | Model performance metrics |
-| `/model-info` | GET | Model configuration details |
-
-### API Demo Screenshots
-
-**Swagger UI (Interactive Documentation):**
-![Swagger UI](screenshots/swagger_ui_new.png)
-
-**Root Endpoint Response:**
-![API Root](screenshots/api_root.png)
-
-**Health Check - All Models Loaded:**
-![Health Check](screenshots/api_health.png)
-
-**Model Info - Random Forest (AutoML Optimized):**
-![Model Info](screenshots/api_model_info.png)
-
-**Prediction Example - Credit Risk Assessment:**
-![Prediction](screenshots/api_predict.png)
+The API has **no authentication**. Any caller who can reach it can score an applicant. It must
+not be exposed publicly without an auth layer in front of it. This is stated in the service
+description and in the module comments rather than being left for a reader to discover.
 
 ---
 
-## Technologies Used
+## Data
 
-| Category | Technology |
-|----------|------------|
-| ML Framework | scikit-learn, XGBoost, LightGBM |
-| Fairness | AIF360 (IBM) |
-| AutoML | Optuna |
-| API | FastAPI, Pydantic |
-| Deployment | Docker, Docker Compose |
-| Monitoring | Logging, Health Checks |
-
----
-
-## Dataset
-
-**German Credit Dataset (UCI ML Repository)**
-
-- 1,000 loan applications
-- 20 features (7 numerical, 13 categorical)
-- 70% good credit, 30% default
-- Protected attributes: gender, age, foreign worker status
+- **German Credit** (UCI Statlog, 1,000 rows). Retained as the small canonical benchmark and as
+  the audit trail for the metric defect. Its integer encoding is recovered from the raw file and
+  asserted in a test, because whether a column may be treated as ordinal depends on it.
+- **Taiwan credit card default** (UCI dataset 350, 30,000 rows). Added as the mid-scale primary
+  because it has both a real repayment outcome and explicit protected attributes. HMDA was
+  rejected: it records application decisions but no repayment outcome, so a credit risk model
+  cannot be trained on it.
 
 ---
 
-## Future Improvements
+## Limitations
 
-- **Fairness**: Adversarial debiasing, calibration
-- **Performance**: Ensemble methods, feature engineering
-- **Deployment**: Kubernetes, A/B testing, model monitoring
-- **Explainability**: SHAP integration for loan decisions
-- **Data**: Active learning for underrepresented groups
-
----
-
-## References
-
-- [AIF360 Documentation](https://aif360.readthedocs.io/)
-- [Fairlearn](https://fairlearn.org/)
-- [German Credit Dataset](https://archive.ics.uci.edu/ml/datasets/statlog+(german+credit+data))
-- [Optuna](https://optuna.org/)
+Stated in full in [MODEL_CARD.md](MODEL_CARD.md). The short version: this is a portfolio
+project, not a lending system. Neither model is calibrated for a real portfolio, the German
+Credit test block is too small for any fairness claim, threshold 0.5 is not an optimised
+operating point (on Taiwan it catches only 36 percent of defaults), and no track was validated
+on data from a different time period than it was trained on.
 
 ---
 
 ## Author
 
-**Aswani Sahoo**
+**Aswani Sahoo** — [GitHub](https://github.com/AswaniSahoo) · [LinkedIn](https://linkedin.com/in/aswani-sahoo)
 
-- GitHub: [@AswaniSahoo](https://github.com/AswaniSahoo)
-- LinkedIn: [Aswani Sahoo](https://linkedin.com/in/aswani-sahoo)
-
----
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT licensed. See [LICENSE](LICENSE).
