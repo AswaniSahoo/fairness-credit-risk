@@ -1,0 +1,18 @@
+{
+  "dataset": "german_credit",
+  "track": "T4_tabfm",
+  "tabfm_commit": "603f4dd1312d8cb80eb7cf92e17287b3bceaa8d8",
+  "checkpoint": "google/tabfm-1.0.0-pytorch/classification",
+  "backend": "pytorch",
+  "device": "cuda",
+  "n_params": 1639444298,
+  "n_estimators": 32,
+  "random_state": 42,
+  "cache_context": false,
+  "n_train_context_rows": 600,
+  "n_test_rows": 200,
+  "fit_seconds": 0.074,
+  "predict_seconds_total": 53.233,
+  "predict_seconds_per_row": 0.2662,
+  "vram_gb_after_predict": 3.06
+}
