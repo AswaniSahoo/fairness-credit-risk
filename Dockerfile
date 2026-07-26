@@ -17,6 +17,9 @@ COPY api/ ./api/
 COPY artifacts/ ./artifacts/
 COPY config/ ./config/
 COPY src/ ./src/
+# /metrics serves the recorded test-block metrics straight from this artifact rather than
+# from hardcoded values, so the image is broken without it.
+COPY reports/track_comparison.json ./reports/track_comparison.json
 
 EXPOSE 8000
 

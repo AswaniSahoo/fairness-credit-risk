@@ -81,6 +81,10 @@ class DatasetSpec:
     # encoded width identical across tracks and splits, which is a precondition for the
     # comparison being about the intervention and nothing else.
     nominal_categories: dict[str, tuple[int, ...]] = field(default_factory=dict)
+    # Columns that are not themselves a protected attribute but recover one. Declared so the
+    # serving layer can refuse them as input rather than silently dropping them, which would
+    # let a caller believe the model had considered a factor it must not consider.
+    prohibited_proxies: tuple[str, ...] = ()
     # Undocumented category codes folded before encoding, per roadmap task 4.5.
     category_folds: dict[str, dict[int, int]] = field(default_factory=dict)
 
@@ -97,6 +101,14 @@ class DatasetSpec:
     def measurement_columns(self) -> tuple[str, ...]:
         """Columns needed at evaluation time but not for prediction."""
         return tuple(attribute.column for attribute in self.protected)
+
+    @property
+    def prohibited_inputs(self) -> tuple[str, ...]:
+        """Columns the serving layer must refuse: prohibited bases and their proxies."""
+        bases = tuple(
+            attribute.column for attribute in self.protected if attribute.prohibited_basis
+        )
+        return tuple(sorted(set(bases) | set(self.prohibited_proxies)))
 
     def protected_attribute(self, column: str | None = None) -> ProtectedAttribute:
         """Look up a protected attribute, defaulting to the primary one.
@@ -147,7 +159,7 @@ class DatasetSpec:
                 raise ValueError(f"{self.name}: columns declared in two roles: {overlap}")
             seen |= set(role)
 
-        prohibited = {a.column for a in self.protected if a.prohibited_basis}
+        prohibited = set(self.prohibited_inputs)
         if leaked := sorted(prohibited & set(self.feature_columns)):
             raise ValueError(f"{self.name}: prohibited basis used as a feature: {leaked}")
 
@@ -246,6 +258,9 @@ GERMAN_CREDIT = DatasetSpec(
         ),
     ),
     primary_protected="gender",
+    # Finding B5: code 1 is A92, the only female code present, so this column recovers sex
+    # exactly. It is refused as serving input rather than dropped.
+    prohibited_proxies=("personal_status_sex",),
     provenance=(
         "UCI Statlog German Credit, Hofmann. data/raw/german.data label-encoded "
         "alphabetically per code. Mapping asserted in "

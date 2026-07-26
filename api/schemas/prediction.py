@@ -1,98 +1,99 @@
-from pydantic import BaseModel, Field, validator
-from typing import Optional, Dict, Any
+"""Request and response schemas for the credit risk prediction API.
+
+Field names match ``GERMAN_CREDIT.feature_columns`` exactly. Domain constraints come from
+the UCI german.doc codebook. Protected attributes (gender, personal_status_sex,
+foreign_worker) are absent because they are prohibited bases under ECOA.
+"""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
 
 class CreditApplicationRequest(BaseModel):
-    """Input schema for credit risk prediction"""
-    
-    # Account status
-    status: int = Field(..., description="Status of existing checking account (A11-A14)", ge=0)
-    
-    # Credit details
-    duration: int = Field(..., description="Duration in months", ge=1, le=72)
-    credit_history: int = Field(..., description="Credit history code (A30-A34)", ge=0)
-    purpose: int = Field(..., description="Purpose of credit (A40-A410)", ge=0)
-    amount: int = Field(..., description="Credit amount", ge=250, le=20000)
-    
-    # Savings and employment
-    savings: int = Field(..., description="Savings account/bonds (A61-A65)", ge=0)
-    employment_duration: int = Field(..., description="Present employment since (A71-A75)", ge=0)
-    installment_rate: int = Field(..., description="Installment rate as % of disposable income", ge=1, le=4)
-    
-    # Personal information
-    personal_status_sex: int = Field(..., description="Personal status and sex (A91-A95)", ge=0)
-    other_debtors: int = Field(..., description="Other debtors/guarantors (A101-A103)", ge=0)
-    present_residence: int = Field(..., description="Present residence since (years)", ge=1, le=4)
-    property: int = Field(..., description="Property type (A121-A124)", ge=0)
-    age: int = Field(..., description="Age in years", ge=18, le=100)
-    
-    # Other credits and housing
-    other_installment_plans: int = Field(..., description="Other installment plans (A141-A143)", ge=0)
-    housing: int = Field(..., description="Housing type (A151-A153)", ge=0)
-    number_credits: int = Field(..., description="Number of existing credits at this bank", ge=1, le=4)
-    
-    # Job and other
-    job: int = Field(..., description="Job category (A171-A174)", ge=0)
-    people_liable: int = Field(..., description="Number of people being liable", ge=1, le=2)
-    telephone: int = Field(..., description="Telephone (A191-A192)", ge=0)
-    foreign_worker: int = Field(..., description="Foreign worker (A201-A202)", ge=0)
-    
-    # Protected attributes (for fairness monitoring only - NOT used in prediction)
-    gender: Optional[int] = Field(None, description="Gender (0=female, 1=male) - for fairness monitoring only")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "status": 0,
-                "duration": 12,
-                "credit_history": 2,
-                "purpose": 3,
-                "amount": 5000,
-                "savings": 0,
-                "employment_duration": 2,
-                "installment_rate": 2,
-                "personal_status_sex": 2,
-                "other_debtors": 0,
-                "present_residence": 3,
-                "property": 1,
-                "age": 35,
-                "other_installment_plans": 0,
-                "housing": 1,
-                "number_credits": 1,
-                "job": 2,
-                "people_liable": 1,
-                "telephone": 0,
-                "foreign_worker": 0,
-                "gender": 1
-            }
+    """One applicant's feature vector, validated against the codebook domain."""
+
+    # --- numeric (5) ---
+    duration: int = Field(..., ge=4, le=72)
+    amount: int = Field(..., ge=250, le=20000)
+    age: int = Field(..., ge=19, le=75)
+    number_credits: int = Field(..., ge=1, le=4)
+    people_liable: int = Field(..., ge=1, le=2)
+
+    # --- ordinal (4) ---
+    # A71=0 .. A75=4
+    employment_duration: int = Field(..., ge=0, le=4)
+    # 1 to 4, percentage of disposable income
+    installment_rate: int = Field(..., ge=1, le=4)
+    # 1 to 4, years at current residence
+    present_residence: int = Field(..., ge=1, le=4)
+    # A171=0 .. A174=3
+    job: int = Field(..., ge=0, le=3)
+
+    # --- nominal (9) ---
+    # A11=0 .. A14=3
+    status: int = Field(..., ge=0, le=3)
+    # A30=0 .. A34=4
+    credit_history: int = Field(..., ge=0, le=4)
+    # A40=0 .. A49=9 (A47 never occurs but is in the domain)
+    purpose: int = Field(..., ge=0, le=9)
+    # A61=0 .. A65=4
+    savings: int = Field(..., ge=0, le=4)
+    # A101=0 .. A103=2
+    other_debtors: int = Field(..., ge=0, le=2)
+    # A121=0 .. A124=3
+    property: int = Field(..., ge=0, le=3)
+    # A141=0 .. A143=2
+    other_installment_plans: int = Field(..., ge=0, le=2)
+    # A151=0 .. A153=2
+    housing: int = Field(..., ge=0, le=2)
+    # A191=0, A192=1
+    telephone: Literal[0, 1] = Field(...)
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "duration": 24,
+                    "amount": 5951,
+                    "age": 35,
+                    "number_credits": 1,
+                    "people_liable": 1,
+                    "employment_duration": 2,
+                    "installment_rate": 2,
+                    "present_residence": 3,
+                    "job": 2,
+                    "status": 1,
+                    "credit_history": 2,
+                    "purpose": 3,
+                    "savings": 0,
+                    "other_debtors": 0,
+                    "property": 1,
+                    "other_installment_plans": 2,
+                    "housing": 1,
+                    "telephone": 0,
+                }
+            ]
         }
+    }
 
-class CreditPredictionResponse(BaseModel):
-    """Output schema for credit risk prediction"""
-    
-    prediction: int = Field(..., description="Predicted class: 0=Good Credit, 1=Default Risk")
-    prediction_label: str = Field(..., description="Human-readable prediction")
-    probability_default: float = Field(..., description="Probability of default (0-1)")
-    probability_good: float = Field(..., description="Probability of good credit (0-1)")
-    risk_level: str = Field(..., description="Risk level: Low, Medium, High")
-    fairness_adjusted: bool = Field(..., description="Whether fairness post-processing was applied")
-    model_version: str = Field(default="1.0.0", description="Model version")
-    
+
+class PredictionResponse(BaseModel):
+    """Decision returned by POST /predict."""
+
+    probability_of_default: float = Field(..., ge=0.0, le=1.0)
+    decision: Literal["approve", "decline"]
+    threshold: float
+    track: str
+    dataset: str
+
+
 class HealthResponse(BaseModel):
-    """Health check response"""
-    status: str
-    model_loaded: bool
-    preprocessor_loaded: bool
-    fairness_module_loaded: bool
-    version: str
+    """GET /health response."""
 
-class ModelMetricsResponse(BaseModel):
-    """Model performance metrics"""
-    roc_auc: float
-    balanced_accuracy: float
-    f1_score: float
-    precision: float
-    recall: float
-    disparate_impact: float
-    statistical_parity_difference: float
-    equal_opportunity_difference: float
-    fairness_compliant: bool
+    status: Literal["ok", "unavailable"]
+    track: str | None
+    dataset: str | None
+    artifact_loaded: bool
