@@ -35,10 +35,16 @@ huggingface/
 # the converted CSV is committed, so the archives add nothing but weight.
 data/raw/taiwan_credit/
 
-# Fitted track models. Regenerable from a seeded run, and finding R8 showed that committed
-# tree pickles stop loading across scikit-learn versions. The split artifact and the metrics
-# JSON are committed instead, because those are what make a run reproducible.
-artifacts/tracks/
+# Fitted track models: only the T0 baselines are committed, because the serving layer, the
+# demo and the API tests cannot run on a clean checkout without them. The mitigation tracks
+# are excluded on size: T2's randomised ensemble holds one copy of the base learner per
+# iteration, which is 9.5 MB on German Credit and 32 MB on Taiwan. Their metrics are in
+# reports/track_comparison.json and scripts/run_comparison.py rebuilds the models from the
+# recorded seed and parameters. requirements.txt pins the versions that produced them, since
+# finding R8 showed tree pickles stop loading across scikit-learn versions.
+artifacts/tracks/*
+!artifacts/tracks/german_credit_T0.joblib
+!artifacts/tracks/taiwan_credit_T0.joblib
 
 # Machine-specific local utility: hardcodes an absolute Docker VHDX path.
 compact_docker.bat

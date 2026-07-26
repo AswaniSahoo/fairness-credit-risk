@@ -10,7 +10,7 @@ import json
 import pytest
 
 from src.data.registry import GERMAN_CREDIT
-from src.pipelines.tracks import record_run, run_baseline_track
+from src.pipelines.tracks import load_inputs, record_run, run_baseline_track
 
 pytestmark = pytest.mark.integration
 
@@ -19,17 +19,18 @@ SEED = 42
 
 @pytest.fixture(scope="module")
 def baseline():
-    run, estimator, split = run_baseline_track(
+    inputs = load_inputs(
+        GERMAN_CREDIT, seed=SEED, test_size=0.2, calibration_size=0.2
+    )
+    run, estimator, search = run_baseline_track(
         GERMAN_CREDIT,
+        inputs,
         seed=SEED,
         n_trials=2,
         cv_folds=2,
-        test_size=0.2,
-        calibration_size=0.2,
         n_bootstrap=50,
-        save_model=False,
     )
-    return run, estimator, split
+    return run, estimator, inputs.split
 
 
 def test_track_uses_the_shared_three_way_split(baseline):
@@ -106,5 +107,5 @@ def test_record_run_keys_by_dataset_and_track_without_dropping_other_runs(baseli
 
     written = json.loads(path.read_text(encoding="utf-8"))
     assert set(written["runs"]) == {"german_credit|T0", "german_credit|T1"}
-    assert written["schema_version"] == 1
+    assert written["schema_version"] == 2
     assert written["runs"]["german_credit|T0"]["provenance"] == GERMAN_CREDIT.provenance

@@ -41,14 +41,18 @@ class CategoryFolder(BaseEstimator, TransformerMixin):
     """
 
     def __init__(self, folds: dict[str, dict[int, int]] | None = None) -> None:
-        self.folds = folds or {}
+        # Stored exactly as passed. scikit-learn's clone contract requires that every
+        # constructor argument round-trip unchanged through get_params, so normalising None
+        # to {} here would make the estimator unclonable. fairlearn's ExponentiatedGradient
+        # clones the pipeline on every iteration, so this is load-bearing, not pedantry.
+        self.folds = folds
 
     def fit(self, X: pd.DataFrame, y: object = None) -> CategoryFolder:  # noqa: N803, ARG002
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:  # noqa: N803
         folded = X.copy()
-        for column, mapping in self.folds.items():
+        for column, mapping in (self.folds or {}).items():
             if column in folded.columns:
                 folded[column] = folded[column].replace(mapping)
         return folded

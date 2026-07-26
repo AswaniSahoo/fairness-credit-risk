@@ -2,7 +2,9 @@
   "runs": {
     "german_credit|T0": {
       "dataset": "german_credit",
-      "description": "Tuned baseline, no fairness intervention. Optuna search over random forest, XGBoost, LightGBM and logistic regression, selected by cross-validated ROC-AUC on the training block only.",
+      "deployability_note": "Deployable. A single global threshold is applied to every applicant and no protected attribute reaches the model.",
+      "deployable": true,
+      "description": "Tuned baseline. Optuna search over random forest, XGBoost, LightGBM and regularised logistic regression, selected by cross-validated ROC-AUC on the training block only.",
       "fairness": {
         "disparate_impact": 0.7263157894736842,
         "equal_opportunity_difference": -0.16999999999999993,
@@ -64,6 +66,8 @@
           "point": -0.18840579710144922
         }
       },
+      "intervention": "none",
+      "matched": null,
       "model": {
         "cv_folds": 5,
         "cv_score": 0.7790343915343916,
@@ -97,17 +101,977 @@
       },
       "protected_attribute": "gender",
       "provenance": "UCI Statlog German Credit, Hofmann. data/raw/german.data label-encoded alphabetically per code. Mapping asserted in tests/integration/test_german_provenance.py.",
-      "recorded_at": "2026-07-26T15:33:02+00:00",
+      "recorded_at": "2026-07-26T16:57:30+00:00",
+      "search_note": "Own search: 60 trials, 5-fold CV.",
       "seed": 42,
+      "selection_rate": 0.63,
       "split_fingerprint": "5f29293fb76300c1",
       "split_sizes": {
         "calibration": 200,
         "test": 200,
         "train": 600
       },
+      "stage": "control",
       "threshold": 0.5,
       "track": "T0"
+    },
+    "german_credit|T1": {
+      "dataset": "german_credit",
+      "deployability_note": "Deployable. Weights affect training only; inference is unchanged and sees no protected attribute.",
+      "deployable": true,
+      "description": "Sample weights equalising the group-by-outcome cells, recomputed inside every cross-validation fold from that fold's training rows only.",
+      "fairness": {
+        "disparate_impact": 0.6774193548387097,
+        "equal_opportunity_difference": -0.21500000000000008,
+        "equalized_odds_difference": 0.21500000000000008,
+        "fpr_privileged": 0.34210526315789475,
+        "fpr_unprivileged": 0.22727272727272727,
+        "n_privileged": 138.0,
+        "n_unprivileged": 62.0,
+        "selection_rate_privileged": 0.6666666666666666,
+        "selection_rate_unprivileged": 0.45161290322580644,
+        "statistical_parity_difference": -0.2150537634408602,
+        "tpr_privileged": 0.79,
+        "tpr_unprivileged": 0.575
+      },
+      "intervals": {
+        "balanced_accuracy": {
+          "ci_high": 0.7773809523809524,
+          "ci_low": 0.6464285714285715,
+          "point": 0.7142857142857142
+        },
+        "brier": {
+          "ci_high": 0.20081649888453265,
+          "ci_low": 0.17493359669794104,
+          "point": 0.18768527426245454
+        },
+        "disparate_impact": {
+          "ci_high": 0.879346920063349,
+          "ci_low": 0.48480517406579365,
+          "point": 0.6774193548387097
+        },
+        "equal_opportunity_difference": {
+          "ci_high": -0.040000000000000036,
+          "ci_low": -0.39499999999999996,
+          "point": -0.21500000000000008
+        },
+        "equalized_odds_difference": {
+          "ci_high": 0.4051022727272722,
+          "ci_low": 0.08499999999999996,
+          "point": 0.21500000000000008
+        },
+        "f1": {
+          "ci_high": 0.676056338028169,
+          "ci_low": 0.5179856115107914,
+          "point": 0.6
+        },
+        "recall": {
+          "ci_high": 0.8166666666666667,
+          "ci_low": 0.5833333333333334,
+          "point": 0.7
+        },
+        "roc_auc": {
+          "ci_high": 0.8819047619047619,
+          "ci_low": 0.7733303571428572,
+          "point": 0.8297619047619047
+        },
+        "statistical_parity_difference": {
+          "ci_high": -0.07548503973819545,
+          "ci_low": -0.3536933146330061,
+          "point": -0.2150537634408602
+        }
+      },
+      "intervention": "Kamiran-Calders reweighing",
+      "matched": {
+        "fairness": {
+          "disparate_impact": 0.7263157894736842,
+          "equal_opportunity_difference": -0.16999999999999993,
+          "equalized_odds_difference": 0.16999999999999993,
+          "fpr_privileged": 0.34210526315789475,
+          "fpr_unprivileged": 0.22727272727272727,
+          "n_privileged": 138.0,
+          "n_unprivileged": 62.0,
+          "selection_rate_privileged": 0.6884057971014492,
+          "selection_rate_unprivileged": 0.5,
+          "statistical_parity_difference": -0.18840579710144922,
+          "tpr_privileged": 0.82,
+          "tpr_unprivileged": 0.65
+        },
+        "performance": {
+          "accuracy": 0.75,
+          "average_precision": 0.6636275641588595,
+          "balanced_accuracy": 0.7357142857142858,
+          "brier": 0.18768527426245454,
+          "f1": 0.6268656716417911,
+          "precision": 0.5675675675675675,
+          "recall": 0.7,
+          "roc_auc": 0.8297619047619047
+        },
+        "reference_selection_rate": 0.63,
+        "selection_rate": 0.63,
+        "threshold": 0.5107650756835938
+      },
+      "model": {
+        "cv_folds": 5,
+        "cv_score": 0.7784391534391535,
+        "model_type": "xgboost",
+        "n_trials": 60,
+        "params": {
+          "colsample_bytree": 0.4184317125068178,
+          "learning_rate": 0.005456534682035869,
+          "max_depth": 5,
+          "min_child_weight": 1,
+          "n_estimators": 350,
+          "reg_alpha": 0.02283375036073746,
+          "reg_lambda": 19.754630864284056,
+          "scale_pos_weight": 2.119475432411561,
+          "subsample": 0.7296608602343859
+        },
+        "scoring": "roc_auc",
+        "seed": 42,
+        "weight_max": 1.08,
+        "weight_min": 0.8584615384615385
+      },
+      "n_bootstrap": 2000,
+      "n_encoded_features": 47,
+      "performance": {
+        "accuracy": 0.72,
+        "average_precision": 0.6636275641588595,
+        "balanced_accuracy": 0.7142857142857142,
+        "brier": 0.18768527426245454,
+        "f1": 0.6,
+        "precision": 0.525,
+        "recall": 0.7,
+        "roc_auc": 0.8297619047619047
+      },
+      "protected_attribute": "gender",
+      "provenance": "UCI Statlog German Credit, Hofmann. data/raw/german.data label-encoded alphabetically per code. Mapping asserted in tests/integration/test_german_provenance.py.",
+      "recorded_at": "2026-07-26T16:59:07+00:00",
+      "search_note": "Own search under weighting: 60 trials, 5-fold CV.",
+      "seed": 42,
+      "selection_rate": 0.6,
+      "split_fingerprint": "5f29293fb76300c1",
+      "split_sizes": {
+        "calibration": 200,
+        "test": 200,
+        "train": 600
+      },
+      "stage": "pre-processing",
+      "threshold": 0.5,
+      "track": "T1"
+    },
+    "german_credit|T2": {
+      "dataset": "german_credit",
+      "deployability_note": "Deployable with a caveat: the classifier is randomised, so two identical applications can receive different decisions. That is defensible for a fairness constraint but has to be disclosed, and it complicates adverse-action reasoning.",
+      "deployable": true,
+      "description": "Constrained optimisation. The reduction refits the base learner under Lagrange-multiplier weights until the selection-rate gap is within epsilon, producing a randomised ensemble.",
+      "fairness": {
+        "disparate_impact": 0.7263157894736842,
+        "equal_opportunity_difference": -0.16999999999999993,
+        "equalized_odds_difference": 0.16999999999999993,
+        "fpr_privileged": 0.34210526315789475,
+        "fpr_unprivileged": 0.22727272727272727,
+        "n_privileged": 138.0,
+        "n_unprivileged": 62.0,
+        "selection_rate_privileged": 0.6884057971014492,
+        "selection_rate_unprivileged": 0.5,
+        "statistical_parity_difference": -0.18840579710144922,
+        "tpr_privileged": 0.82,
+        "tpr_unprivileged": 0.65
+      },
+      "intervals": {
+        "balanced_accuracy": {
+          "ci_high": 0.7988095238095239,
+          "ci_low": 0.6678571428571429,
+          "point": 0.7357142857142858
+        },
+        "brier": {
+          "ci_high": 0.31,
+          "ci_low": 0.195,
+          "point": 0.25
+        },
+        "disparate_impact": {
+          "ci_high": 0.9106370581879917,
+          "ci_low": 0.5341703629032258,
+          "point": 0.7263157894736842
+        },
+        "equal_opportunity_difference": {
+          "ci_high": -0.015000000000000013,
+          "ci_low": -0.34012499999999996,
+          "point": -0.16999999999999993
+        },
+        "equalized_odds_difference": {
+          "ci_high": 0.37999999999999995,
+          "ci_low": 0.06214593301435406,
+          "point": 0.16999999999999993
+        },
+        "f1": {
+          "ci_high": 0.7058823529411765,
+          "ci_low": 0.5413533834586466,
+          "point": 0.6268656716417911
+        },
+        "recall": {
+          "ci_high": 0.8166666666666667,
+          "ci_low": 0.5833333333333334,
+          "point": 0.7
+        },
+        "roc_auc": {
+          "ci_high": 0.7988095238095237,
+          "ci_low": 0.6678571428571429,
+          "point": 0.7357142857142857
+        },
+        "statistical_parity_difference": {
+          "ci_high": -0.05703599812996718,
+          "ci_low": -0.3319308087891538,
+          "point": -0.18840579710144922
+        }
+      },
+      "intervention": "ExponentiatedGradient, demographic parity",
+      "matched": null,
+      "model": {
+        "baseline_calibration_balanced_accuracy": 0.6857142857142857,
+        "calibration_frontier": [
+          {
+            "calibration_balanced_accuracy": 0.6857142857142857,
+            "calibration_selection_rate": 0.66,
+            "calibration_statistical_parity_difference": 0.02524544179523136,
+            "epsilon": 0.02,
+            "n_ensemble_predictors": 3,
+            "n_weights_nonzero": 1
+          },
+          {
+            "calibration_balanced_accuracy": 0.6857142857142857,
+            "calibration_selection_rate": 0.66,
+            "calibration_statistical_parity_difference": 0.02524544179523136,
+            "epsilon": 0.05,
+            "n_ensemble_predictors": 4,
+            "n_weights_nonzero": 1
+          },
+          {
+            "calibration_balanced_accuracy": 0.6857142857142857,
+            "calibration_selection_rate": 0.66,
+            "calibration_statistical_parity_difference": 0.02524544179523136,
+            "epsilon": 0.1,
+            "n_ensemble_predictors": 3,
+            "n_weights_nonzero": 1
+          }
+        ],
+        "class_weighting": "T0's class weighting is kept. Removing it so the reduction's instance weights would be the only reweighting produced a base learner predicting the positive class for 2 percent of training rows, and an ensemble approving 97.5 percent of applicants.",
+        "constraint": "demographic_parity",
+        "constraint_binding": false,
+        "cv_folds": 5,
+        "cv_score": 0.7790343915343916,
+        "ensemble_weights_nonzero": 1,
+        "epsilon": 0.02,
+        "epsilon_grid": [
+          0.02,
+          0.05,
+          0.1
+        ],
+        "epsilon_selection": "The constraint did not bind at any epsilon in [0.02, 0.05, 0.1]. The base learner's training-block parity gap is -0.0143, already inside the tightest bound, so the reduction returned the base learner unchanged. The test-block disparity is a generalisation gap, which a constraint measured on the training distribution cannot see. The tightest epsilon is reported.",
+        "max_iter": 50,
+        "model_type": "exponentiated_gradient(xgboost)",
+        "n_ensemble_predictors": 3,
+        "n_trials": 60,
+        "n_unique_scores": 2,
+        "params": {
+          "colsample_bytree": 0.41326840175945323,
+          "learning_rate": 0.005539555860572883,
+          "max_depth": 5,
+          "min_child_weight": 1,
+          "n_estimators": 350,
+          "reg_alpha": 0.023776828998491078,
+          "reg_lambda": 15.692645577411271,
+          "scale_pos_weight": 2.0322071043988914,
+          "subsample": 0.7221548753079111
+        },
+        "scores_are_graded": false,
+        "scoring": "roc_auc",
+        "seed": 42,
+        "train_statistical_parity_difference": -0.014258999532491878
+      },
+      "n_bootstrap": 2000,
+      "n_encoded_features": 47,
+      "performance": {
+        "accuracy": 0.75,
+        "average_precision": 0.48729729729729726,
+        "balanced_accuracy": 0.7357142857142858,
+        "brier": 0.25,
+        "f1": 0.6268656716417911,
+        "precision": 0.5675675675675675,
+        "recall": 0.7,
+        "roc_auc": 0.7357142857142857
+      },
+      "protected_attribute": "gender",
+      "provenance": "UCI Statlog German Credit, Hofmann. data/raw/german.data label-encoded alphabetically per code. Mapping asserted in tests/integration/test_german_provenance.py.",
+      "recorded_at": "2026-07-26T16:59:33+00:00",
+      "search_note": "Reuses T0's selected configuration as the base learner. Searching it would cost trials times folds times ensemble refits, and holding the base learner fixed isolates the constraint as the only difference from the control. The constraint did not bind at any epsilon in [0.02, 0.05, 0.1]. The base learner's training-block parity gap is -0.0143, already inside the tightest bound, so the reduction returned the base learner unchanged. The test-block disparity is a generalisation gap, which a constraint measured on the training distribution cannot see. The tightest epsilon is reported.",
+      "seed": 42,
+      "selection_rate": 0.63,
+      "split_fingerprint": "5f29293fb76300c1",
+      "split_sizes": {
+        "calibration": 200,
+        "test": 200,
+        "train": 600
+      },
+      "stage": "in-processing",
+      "threshold": null,
+      "track": "T2"
+    },
+    "german_credit|T3": {
+      "dataset": "german_credit",
+      "deployability_note": "NOT deployable. The rule keys the decision on the applicant's sex, which is disparate treatment under ECOA and Regulation B even when it improves a group fairness metric. Reported to document why this design was abandoned.",
+      "deployable": false,
+      "description": "A separate decision threshold per protected group, chosen on the calibration block to equalise true positive rates.",
+      "fairness": {
+        "disparate_impact": 0.6583371194911404,
+        "equal_opportunity_difference": -0.17500000000000004,
+        "equalized_odds_difference": 0.17500000000000004,
+        "fpr_privileged": 0.15789473684210525,
+        "fpr_unprivileged": 0.09090909090909091,
+        "n_privileged": 138.0,
+        "n_unprivileged": 62.0,
+        "selection_rate_privileged": 0.5144927536231884,
+        "selection_rate_unprivileged": 0.3387096774193548,
+        "statistical_parity_difference": -0.17578307620383354,
+        "tpr_privileged": 0.65,
+        "tpr_unprivileged": 0.475
+      },
+      "intervals": {
+        "balanced_accuracy": {
+          "ci_high": 0.7880952380952382,
+          "ci_low": 0.6738095238095239,
+          "point": 0.7333333333333334
+        },
+        "brier": {
+          "ci_high": 0.19662702419046668,
+          "ci_low": 0.170497898325849,
+          "point": 0.18334168765754622
+        },
+        "disparate_impact": {
+          "ci_high": 0.9032258064516129,
+          "ci_low": 0.433598659405111,
+          "point": 0.6583371194911404
+        },
+        "equal_opportunity_difference": {
+          "ci_high": 0.0050000000000000044,
+          "ci_low": -0.35,
+          "point": -0.17500000000000004
+        },
+        "equalized_odds_difference": {
+          "ci_high": 0.35,
+          "ci_low": 0.047775717703349284,
+          "point": 0.17500000000000004
+        },
+        "f1": {
+          "ci_high": 0.6750039808917198,
+          "ci_low": 0.5613684210526315,
+          "point": 0.6190476190476191
+        },
+        "recall": {
+          "ci_high": 0.95,
+          "ci_low": 0.7833333333333333,
+          "point": 0.8666666666666667
+        },
+        "roc_auc": {
+          "ci_high": 0.8803660714285714,
+          "ci_low": 0.7724970238095238,
+          "point": 0.8296428571428571
+        },
+        "statistical_parity_difference": {
+          "ci_high": -0.04834618980832188,
+          "ci_low": -0.3055165965404395,
+          "point": -0.17578307620383354
+        }
+      },
+      "intervention": "group-specific thresholds",
+      "matched": null,
+      "model": {
+        "constraint": "true_positive_rate_parity",
+        "cv_folds": 5,
+        "cv_score": 0.7790343915343916,
+        "fitted_on": "calibration",
+        "model_type": "threshold_optimizer(xgboost)",
+        "n_trials": 60,
+        "objective": "balanced_accuracy_score",
+        "params": {
+          "colsample_bytree": 0.41326840175945323,
+          "learning_rate": 0.005539555860572883,
+          "max_depth": 5,
+          "min_child_weight": 1,
+          "n_estimators": 350,
+          "reg_alpha": 0.023776828998491078,
+          "reg_lambda": 15.692645577411271,
+          "scale_pos_weight": 2.0322071043988914,
+          "subsample": 0.7221548753079111
+        },
+        "scoring": "roc_auc",
+        "seed": 42
+      },
+      "n_bootstrap": 2000,
+      "n_encoded_features": 47,
+      "performance": {
+        "accuracy": 0.68,
+        "average_precision": 0.6513913690696003,
+        "balanced_accuracy": 0.7333333333333334,
+        "brier": 0.18334168765754622,
+        "f1": 0.6190476190476191,
+        "precision": 0.48148148148148145,
+        "recall": 0.8666666666666667,
+        "roc_auc": 0.8296428571428571
+      },
+      "protected_attribute": "gender",
+      "provenance": "UCI Statlog German Credit, Hofmann. data/raw/german.data label-encoded alphabetically per code. Mapping asserted in tests/integration/test_german_provenance.py.",
+      "recorded_at": "2026-07-26T16:59:40+00:00",
+      "search_note": "Wraps T0's fitted model; thresholds fitted on the calibration block.",
+      "seed": 42,
+      "selection_rate": 0.46,
+      "split_fingerprint": "5f29293fb76300c1",
+      "split_sizes": {
+        "calibration": 200,
+        "test": 200,
+        "train": 600
+      },
+      "stage": "post-processing",
+      "threshold": null,
+      "track": "T3"
+    },
+    "taiwan_credit|T0": {
+      "dataset": "taiwan_credit",
+      "deployability_note": "Deployable. A single global threshold is applied to every applicant and no protected attribute reaches the model.",
+      "deployable": true,
+      "description": "Tuned baseline. Optuna search over random forest, XGBoost, LightGBM and regularised logistic regression, selected by cross-validated ROC-AUC on the training block only.",
+      "fairness": {
+        "disparate_impact": 0.9766769748334089,
+        "equal_opportunity_difference": -0.011539613613393063,
+        "equalized_odds_difference": 0.011539613613393063,
+        "fpr_privileged": 0.636968085106383,
+        "fpr_unprivileged": 0.6330434782608696,
+        "n_privileged": 3622.0,
+        "n_unprivileged": 2378.0,
+        "selection_rate_privileged": 0.8972943125345113,
+        "selection_rate_unprivileged": 0.8763666947014298,
+        "statistical_parity_difference": -0.020927617833081502,
+        "tpr_privileged": 0.9655052264808363,
+        "tpr_unprivileged": 0.9539656128674432
+      },
+      "intervals": {
+        "balanced_accuracy": {
+          "ci_high": 0.6755920408748747,
+          "ci_low": 0.6499563704398804,
+          "point": 0.6628926680568566
+        },
+        "brier": {
+          "ci_high": 0.1352474723222142,
+          "ci_low": 0.1283947541859838,
+          "point": 0.13170642795671236
+        },
+        "disparate_impact": {
+          "ci_high": 0.993350429199053,
+          "ci_low": 0.9594212854069926,
+          "point": 0.9766769748334089
+        },
+        "equal_opportunity_difference": {
+          "ci_high": -0.0006876701819073552,
+          "ci_low": -0.023187583218831916,
+          "point": -0.011539613613393063
+        },
+        "equalized_odds_difference": {
+          "ci_high": 0.05998155642923214,
+          "ci_low": 0.005166316405539423,
+          "point": 0.011539613613393063
+        },
+        "f1": {
+          "ci_high": 0.5113991276912572,
+          "ci_low": 0.4591671283898175,
+          "point": 0.48569994982438536
+        },
+        "recall": {
+          "ci_high": 0.3888470233609646,
+          "ci_low": 0.33911077618688773,
+          "point": 0.36473247927656366
+        },
+        "roc_auc": {
+          "ci_high": 0.8037356329253447,
+          "ci_low": 0.7755277193246135,
+          "point": 0.7901955162261487
+        },
+        "statistical_parity_difference": {
+          "ci_high": -0.005953193942819243,
+          "ci_low": -0.03657013907626464,
+          "point": -0.020927617833081502
+        }
+      },
+      "intervention": "none",
+      "matched": null,
+      "model": {
+        "cv_folds": 3,
+        "cv_score": 0.7772917087734461,
+        "model_type": "lightgbm",
+        "n_trials": 20,
+        "params": {
+          "class_weight": null,
+          "colsample_bytree": 0.9976099190484614,
+          "learning_rate": 0.005544227851397413,
+          "min_child_samples": 5,
+          "n_estimators": 450,
+          "num_leaves": 35,
+          "reg_lambda": 18.01707161478515,
+          "subsample": 0.5167929424672361,
+          "subsample_freq": 5
+        },
+        "scoring": "roc_auc",
+        "seed": 42
+      },
+      "n_bootstrap": 1000,
+      "n_encoded_features": 27,
+      "performance": {
+        "accuracy": 0.8291666666666667,
+        "average_precision": 0.5730832235252493,
+        "balanced_accuracy": 0.6628926680568566,
+        "brier": 0.13170642795671236,
+        "f1": 0.48569994982438536,
+        "precision": 0.7267267267267268,
+        "recall": 0.36473247927656366,
+        "roc_auc": 0.7901955162261487
+      },
+      "protected_attribute": "SEX",
+      "provenance": "UCI dataset 350, default of credit card clients, Yeh and Lien. Converted from the published .xls by scripts/convert_taiwan_dataset.py; ID column dropped.",
+      "recorded_at": "2026-07-26T17:14:29+00:00",
+      "search_note": "Own search: 20 trials, 3-fold CV.",
+      "seed": 42,
+      "selection_rate": 0.889,
+      "split_fingerprint": "ec9473359f07278a",
+      "split_sizes": {
+        "calibration": 6000,
+        "test": 6000,
+        "train": 18000
+      },
+      "stage": "control",
+      "threshold": 0.5,
+      "track": "T0"
+    },
+    "taiwan_credit|T1": {
+      "dataset": "taiwan_credit",
+      "deployability_note": "Deployable. Weights affect training only; inference is unchanged and sees no protected attribute.",
+      "deployable": true,
+      "description": "Sample weights equalising the group-by-outcome cells, recomputed inside every cross-validation fold from that fold's training rows only.",
+      "fairness": {
+        "disparate_impact": 0.9779151817690687,
+        "equal_opportunity_difference": -0.011539613613393063,
+        "equalized_odds_difference": 0.011539613613393063,
+        "fpr_privileged": 0.6356382978723404,
+        "fpr_unprivileged": 0.6365217391304347,
+        "n_privileged": 3622.0,
+        "n_unprivileged": 2378.0,
+        "selection_rate_privileged": 0.8970182219768084,
+        "selection_rate_unprivileged": 0.8772077375946173,
+        "statistical_parity_difference": -0.019810484382191018,
+        "tpr_privileged": 0.9655052264808363,
+        "tpr_unprivileged": 0.9539656128674432
+      },
+      "intervals": {
+        "balanced_accuracy": {
+          "ci_high": 0.6755975721774512,
+          "ci_low": 0.6493781578214473,
+          "point": 0.6625158783055378
+        },
+        "brier": {
+          "ci_high": 0.13532092199471357,
+          "ci_low": 0.12840819012361812,
+          "point": 0.13175903663993094
+        },
+        "disparate_impact": {
+          "ci_high": 0.9939792309918385,
+          "ci_low": 0.9614865309864796,
+          "point": 0.9779151817690687
+        },
+        "equal_opportunity_difference": {
+          "ci_high": -0.00043037542925932414,
+          "ci_low": -0.023677890700941652,
+          "point": -0.011539613613393063
+        },
+        "equalized_odds_difference": {
+          "ci_high": 0.057337765957446794,
+          "ci_low": 0.005371148743576762,
+          "point": 0.011539613613393063
+        },
+        "f1": {
+          "ci_high": 0.5110308648949728,
+          "ci_low": 0.4578423944956386,
+          "point": 0.48493975903614456
+        },
+        "recall": {
+          "ci_high": 0.388112283345893,
+          "ci_low": 0.33833835719668426,
+          "point": 0.36397889977392617
+        },
+        "roc_auc": {
+          "ci_high": 0.8032318751873668,
+          "ci_low": 0.7753897149379518,
+          "point": 0.7898371910271629
+        },
+        "statistical_parity_difference": {
+          "ci_high": -0.005391852379556918,
+          "ci_low": -0.03483527332036398,
+          "point": -0.019810484382191018
+        }
+      },
+      "intervention": "Kamiran-Calders reweighing",
+      "matched": {
+        "fairness": {
+          "disparate_impact": 0.9774463825448265,
+          "equal_opportunity_difference": -0.011539613613393063,
+          "equalized_odds_difference": 0.011539613613393063,
+          "fpr_privileged": 0.6356382978723404,
+          "fpr_unprivileged": 0.6347826086956522,
+          "n_privileged": 3622.0,
+          "n_unprivileged": 2378.0,
+          "selection_rate_privileged": 0.8970182219768084,
+          "selection_rate_unprivileged": 0.8767872161480236,
+          "statistical_parity_difference": -0.020231005828784787,
+          "tpr_privileged": 0.9655052264808363,
+          "tpr_unprivileged": 0.9539656128674432
+        },
+        "performance": {
+          "accuracy": 0.8291666666666667,
+          "average_precision": 0.5708124614235859,
+          "balanced_accuracy": 0.6628926680568566,
+          "brier": 0.13175903663993094,
+          "f1": 0.48569994982438536,
+          "precision": 0.7267267267267268,
+          "recall": 0.36473247927656366,
+          "roc_auc": 0.7898371910271629
+        },
+        "reference_selection_rate": 0.889,
+        "selection_rate": 0.889,
+        "threshold": 0.4992728451626683
+      },
+      "model": {
+        "cv_folds": 3,
+        "cv_score": 0.7769406517554991,
+        "model_type": "lightgbm",
+        "n_trials": 20,
+        "params": {
+          "class_weight": null,
+          "colsample_bytree": 0.9976099190484614,
+          "learning_rate": 0.005544227851397413,
+          "min_child_samples": 5,
+          "n_estimators": 450,
+          "num_leaves": 35,
+          "reg_lambda": 18.01707161478515,
+          "subsample": 0.5167929424672361,
+          "subsample_freq": 5
+        },
+        "scoring": "roc_auc",
+        "seed": 42,
+        "weight_max": 1.0646686841846276,
+        "weight_min": 0.9153005284867234
+      },
+      "n_bootstrap": 1000,
+      "n_encoded_features": 27,
+      "performance": {
+        "accuracy": 0.829,
+        "average_precision": 0.5708124614235859,
+        "balanced_accuracy": 0.6625158783055378,
+        "brier": 0.13175903663993094,
+        "f1": 0.48493975903614456,
+        "precision": 0.7263157894736842,
+        "recall": 0.36397889977392617,
+        "roc_auc": 0.7898371910271629
+      },
+      "protected_attribute": "SEX",
+      "provenance": "UCI dataset 350, default of credit card clients, Yeh and Lien. Converted from the published .xls by scripts/convert_taiwan_dataset.py; ID column dropped.",
+      "recorded_at": "2026-07-26T17:15:31+00:00",
+      "search_note": "Own search under weighting: 20 trials, 3-fold CV.",
+      "seed": 42,
+      "selection_rate": 0.8891666666666667,
+      "split_fingerprint": "ec9473359f07278a",
+      "split_sizes": {
+        "calibration": 6000,
+        "test": 6000,
+        "train": 18000
+      },
+      "stage": "pre-processing",
+      "threshold": 0.5,
+      "track": "T1"
+    },
+    "taiwan_credit|T2": {
+      "dataset": "taiwan_credit",
+      "deployability_note": "Deployable with a caveat: the classifier is randomised, so two identical applications can receive different decisions. That is defensible for a fairness constraint but has to be disclosed, and it complicates adverse-action reasoning.",
+      "deployable": true,
+      "description": "Constrained optimisation. The reduction refits the base learner under Lagrange-multiplier weights until the selection-rate gap is within epsilon, producing a randomised ensemble.",
+      "fairness": {
+        "disparate_impact": 0.9800229065367837,
+        "equal_opportunity_difference": -0.011475647440096881,
+        "equalized_odds_difference": 0.011475647440096881,
+        "fpr_privileged": 0.6409574468085106,
+        "fpr_unprivileged": 0.648695652173913,
+        "n_privileged": 3622.0,
+        "n_unprivileged": 2378.0,
+        "selection_rate_privileged": 0.8989508558807289,
+        "selection_rate_unprivileged": 0.8809924306139613,
+        "statistical_parity_difference": -0.017958425266767608,
+        "tpr_privileged": 0.9665505226480836,
+        "tpr_unprivileged": 0.9550748752079867
+      },
+      "intervals": {
+        "balanced_accuracy": {
+          "ci_high": 0.6712149743971646,
+          "ci_low": 0.6455968170659552,
+          "point": 0.6589061792712904
+        },
+        "brier": {
+          "ci_high": 0.179,
+          "ci_low": 0.16499166666666668,
+          "point": 0.172
+        },
+        "disparate_impact": {
+          "ci_high": 0.9960974293981434,
+          "ci_low": 0.9635536987023506,
+          "point": 0.9800229065367837
+        },
+        "equal_opportunity_difference": {
+          "ci_high": -0.0004326896133234337,
+          "ci_low": -0.023314433358262682,
+          "point": -0.011475647440096881
+        },
+        "equalized_odds_difference": {
+          "ci_high": 0.05920206984273824,
+          "ci_low": 0.006135177337036024,
+          "point": 0.011475647440096881
+        },
+        "f1": {
+          "ci_high": 0.5027497138916237,
+          "ci_low": 0.45009799717936266,
+          "point": 0.4777327935222672
+        },
+        "recall": {
+          "ci_high": 0.37829691032403917,
+          "ci_low": 0.3300678221552374,
+          "point": 0.3556895252449133
+        },
+        "roc_auc": {
+          "ci_high": 0.6712149743971647,
+          "ci_low": 0.6455968170659552,
+          "point": 0.6589061792712904
+        },
+        "statistical_parity_difference": {
+          "ci_high": -0.003508625682041193,
+          "ci_low": -0.03270985784935437,
+          "point": -0.017958425266767608
+        }
+      },
+      "intervention": "ExponentiatedGradient, demographic parity",
+      "matched": null,
+      "model": {
+        "baseline_calibration_balanced_accuracy": 0.644815951954106,
+        "calibration_frontier": [
+          {
+            "calibration_balanced_accuracy": 0.6420064372751094,
+            "calibration_selection_rate": 0.8986666666666666,
+            "calibration_statistical_parity_difference": -0.02029570577636375,
+            "epsilon": 0.02,
+            "n_ensemble_predictors": 4,
+            "n_weights_nonzero": 1
+          },
+          {
+            "calibration_balanced_accuracy": 0.6425506174659184,
+            "calibration_selection_rate": 0.8965,
+            "calibration_statistical_parity_difference": -0.022281220886843256,
+            "epsilon": 0.05,
+            "n_ensemble_predictors": 6,
+            "n_weights_nonzero": 1
+          },
+          {
+            "calibration_balanced_accuracy": 0.644815951954106,
+            "calibration_selection_rate": 0.894,
+            "calibration_statistical_parity_difference": -0.023714707291830006,
+            "epsilon": 0.1,
+            "n_ensemble_predictors": 1,
+            "n_weights_nonzero": 1
+          }
+        ],
+        "class_weighting": "T0's class weighting is kept. Removing it so the reduction's instance weights would be the only reweighting produced a base learner predicting the positive class for 2 percent of training rows, and an ensemble approving 97.5 percent of applicants.",
+        "constraint": "demographic_parity",
+        "constraint_binding": true,
+        "cv_folds": 3,
+        "cv_score": 0.7772917087734461,
+        "ensemble_weights_nonzero": 1,
+        "epsilon": 0.02,
+        "epsilon_grid": [
+          0.02,
+          0.05,
+          0.1
+        ],
+        "epsilon_selection": "Chosen on calibration: smallest parity gap among candidates within 0.03 balanced accuracy of the control's 0.6448.",
+        "max_iter": 50,
+        "model_type": "exponentiated_gradient(lightgbm)",
+        "n_ensemble_predictors": 4,
+        "n_trials": 20,
+        "n_unique_scores": 2,
+        "params": {
+          "class_weight": null,
+          "colsample_bytree": 0.9976099190484614,
+          "learning_rate": 0.005544227851397413,
+          "min_child_samples": 5,
+          "n_estimators": 450,
+          "num_leaves": 35,
+          "reg_lambda": 18.01707161478515,
+          "subsample": 0.5167929424672361,
+          "subsample_freq": 5
+        },
+        "scores_are_graded": false,
+        "scoring": "roc_auc",
+        "seed": 42,
+        "train_statistical_parity_difference": -0.021397223023758793
+      },
+      "n_bootstrap": 1000,
+      "n_encoded_features": 27,
+      "performance": {
+        "accuracy": 0.828,
+        "average_precision": 0.4011832910872097,
+        "balanced_accuracy": 0.6589061792712904,
+        "brier": 0.172,
+        "f1": 0.4777327935222672,
+        "precision": 0.7272727272727273,
+        "recall": 0.3556895252449133,
+        "roc_auc": 0.6589061792712904
+      },
+      "protected_attribute": "SEX",
+      "provenance": "UCI dataset 350, default of credit card clients, Yeh and Lien. Converted from the published .xls by scripts/convert_taiwan_dataset.py; ID column dropped.",
+      "recorded_at": "2026-07-26T17:17:32+00:00",
+      "search_note": "Reuses T0's selected configuration as the base learner. Searching it would cost trials times folds times ensemble refits, and holding the base learner fixed isolates the constraint as the only difference from the control. Chosen on calibration: smallest parity gap among candidates within 0.03 balanced accuracy of the control's 0.6448.",
+      "seed": 42,
+      "selection_rate": 0.8918333333333334,
+      "split_fingerprint": "ec9473359f07278a",
+      "split_sizes": {
+        "calibration": 6000,
+        "test": 6000,
+        "train": 18000
+      },
+      "stage": "in-processing",
+      "threshold": null,
+      "track": "T2"
+    },
+    "taiwan_credit|T3": {
+      "dataset": "taiwan_credit",
+      "deployability_note": "NOT deployable. The rule keys the decision on the applicant's sex, which is disparate treatment under ECOA and Regulation B even when it improves a group fairness metric. Reported to document why this design was abandoned.",
+      "deployable": false,
+      "description": "A separate decision threshold per protected group, chosen on the calibration block to equalise true positive rates.",
+      "fairness": {
+        "disparate_impact": 0.9425104361784592,
+        "equal_opportunity_difference": -0.025479794612540907,
+        "equalized_odds_difference": 0.03402636447733576,
+        "fpr_privileged": 0.39228723404255317,
+        "fpr_unprivileged": 0.3582608695652174,
+        "n_privileged": 3622.0,
+        "n_unprivileged": 2378.0,
+        "selection_rate_privileged": 0.7401987852015461,
+        "selection_rate_unprivileged": 0.6976450798990749,
+        "statistical_parity_difference": -0.04255370530247127,
+        "tpr_privileged": 0.8313588850174216,
+        "tpr_unprivileged": 0.8058790904048807
+      },
+      "intervals": {
+        "balanced_accuracy": {
+          "ci_high": 0.7352083898087927,
+          "ci_low": 0.7081580746293664,
+          "point": 0.7219922977821089
+        },
+        "brier": {
+          "ci_high": 0.1352474723222142,
+          "ci_low": 0.1283947541859838,
+          "point": 0.13170642795671236
+        },
+        "disparate_impact": {
+          "ci_high": 0.9712165170752445,
+          "ci_low": 0.9136539569234411,
+          "point": 0.9425104361784592
+        },
+        "equal_opportunity_difference": {
+          "ci_high": -0.001544203331265533,
+          "ci_low": -0.04848450414620621,
+          "point": -0.025479794612540907
+        },
+        "equalized_odds_difference": {
+          "ci_high": 0.08580145698427386,
+          "ci_low": 0.012076079163453768,
+          "point": 0.03402636447733576
+        },
+        "f1": {
+          "ci_high": 0.5713350597036397,
+          "ci_low": 0.534451865157227,
+          "point": 0.5530632741881486
+        },
+        "recall": {
+          "ci_high": 0.6458176337603617,
+          "ci_low": 0.5953278070836473,
+          "point": 0.6224566691785983
+        },
+        "roc_auc": {
+          "ci_high": 0.8037356329253447,
+          "ci_low": 0.7755277193246135,
+          "point": 0.7901955162261487
+        },
+        "statistical_parity_difference": {
+          "ci_high": -0.02098918672406139,
+          "ci_low": -0.06490040305970568,
+          "point": -0.04255370530247127
+        }
+      },
+      "intervention": "group-specific thresholds",
+      "matched": null,
+      "model": {
+        "constraint": "true_positive_rate_parity",
+        "cv_folds": 3,
+        "cv_score": 0.7772917087734461,
+        "fitted_on": "calibration",
+        "model_type": "threshold_optimizer(lightgbm)",
+        "n_trials": 20,
+        "objective": "balanced_accuracy_score",
+        "params": {
+          "class_weight": null,
+          "colsample_bytree": 0.9976099190484614,
+          "learning_rate": 0.005544227851397413,
+          "min_child_samples": 5,
+          "n_estimators": 450,
+          "num_leaves": 35,
+          "reg_lambda": 18.01707161478515,
+          "subsample": 0.5167929424672361,
+          "subsample_freq": 5
+        },
+        "scoring": "roc_auc",
+        "seed": 42
+      },
+      "n_bootstrap": 1000,
+      "n_encoded_features": 27,
+      "performance": {
+        "accuracy": 0.7775,
+        "average_precision": 0.5730832235252493,
+        "balanced_accuracy": 0.7219922977821089,
+        "brier": 0.13170642795671236,
+        "f1": 0.5530632741881486,
+        "precision": 0.4975903614457831,
+        "recall": 0.6224566691785983,
+        "roc_auc": 0.7901955162261487
+      },
+      "protected_attribute": "SEX",
+      "provenance": "UCI dataset 350, default of credit card clients, Yeh and Lien. Converted from the published .xls by scripts/convert_taiwan_dataset.py; ID column dropped.",
+      "recorded_at": "2026-07-26T17:17:38+00:00",
+      "search_note": "Wraps T0's fitted model; thresholds fitted on the calibration block.",
+      "seed": 42,
+      "selection_rate": 0.7233333333333334,
+      "split_fingerprint": "ec9473359f07278a",
+      "split_sizes": {
+        "calibration": 6000,
+        "test": 6000,
+        "train": 18000
+      },
+      "stage": "post-processing",
+      "threshold": null,
+      "track": "T3"
     }
   },
-  "schema_version": 1
+  "schema_version": 2
 }
