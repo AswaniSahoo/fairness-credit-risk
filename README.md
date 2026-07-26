@@ -5,7 +5,7 @@ two datasets. The interesting result is that none of them helped much, and the r
 different for each.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-165%20passing-green.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-186%20passing-green.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Every number in this README is generated from [`reports/track_comparison.json`](reports/track_comparison.json)
@@ -62,6 +62,19 @@ and cost balanced accuracy. T3 also made it worse. T2 left the predictions untou
 interval spans the 0.8 four-fifths line, so on this dataset none of these differences is
 distinguishable from noise in the first place.
 
+The per-group rates show where the disparity sits, with the group sizes on the bars because a
+rate on 62 people and a rate on 138 are not the same kind of number:
+
+![Per-group selection, TPR and FPR by track, German Credit](reports/figures/group_rates_german_credit.png)
+
+And the same results as intervals rather than points, which is the honest way to read them:
+
+![Disparate impact intervals by track, German Credit](reports/figures/intervals_german_credit.png)
+
+Every bar crosses the 0.8 line. A reader given only the point estimates would conclude the
+baseline fails the four-fifths rule at 0.7263 and that reweighing makes it worse; the intervals
+say the data cannot support either statement.
+
 ### Taiwan credit default (30,000 rows, 6,000-row test block, 3,622 women and 2,378 men in it)
 
 <!-- generated from reports/tables/track_comparison_taiwan_credit.md -->
@@ -81,6 +94,19 @@ to mitigate. T1 and T2 move it by less than 0.004. T3 makes it worse while impro
 accuracy, because its real effect is to re-pick the operating point rather than to equalise
 anything.
 
+The group rates make T3's mechanism visible. It raises the true positive rate by moving both
+groups' cut-offs, not by closing the gap between them:
+
+![Per-group selection, TPR and FPR by track, Taiwan](reports/figures/group_rates_taiwan_credit.png)
+
+And the intervals, on the same scale as the German Credit plot above, are what statistical power
+actually looks like:
+
+![Disparate impact intervals by track, Taiwan](reports/figures/intervals_taiwan_credit.png)
+
+No bar comes near 0.8. Compare this with the German Credit forest plot: same code, same metric,
+same number of bootstrap replicates, thirty times the test block.
+
 ---
 
 ## The finding worth taking away
@@ -99,6 +125,25 @@ The dataset where fairness is measurable turns out not to need fixing, and the d
 looks unfair cannot support any conclusion about whether it is. Most published fairness results
 on German Credit are three-decimal point estimates on a sample this size. That is the problem
 this repository is really about.
+
+---
+
+## Dataset bias is not model bias
+
+[`notebooks/01_eda_bias_audit.ipynb`](notebooks/01_eda_bias_audit.ipynb) measures the German
+Credit data itself, with no model involved. The recorded outcomes are favorable for 0.7232 of
+men and 0.6484 of women, a disparate impact of **0.8966** — which passes the four-fifths rule.
+The tuned model's disparate impact on the same attribute is **0.7263**, which does not.
+
+Those are two different quantities, and the project's earlier code confused them: it passed
+ground-truth labels to AIF360 and published the result as a model metric. That is why its
+reported figure, 0.8903, sits next to the dataset-level 0.8966 rather than next to the model's
+0.7263. The notebook now states in its first cell that everything in it is a property of the
+data, and the model numbers come only from the comparison artifact.
+
+The notebook also reports the intersectional cells, where the smallest is 23 rows. It prints
+those counts next to the rates, because a favorable rate of 0.8261 on 23 people is not a
+finding.
 
 ---
 
@@ -177,9 +222,21 @@ scripts/
   run_comparison.py       runs the tracks and records results
   generate_report_assets.py  produces every table and figure from the artifact
   verify_german_encoding.py  recovers and checks the dataset's own encoding
+notebooks/
+  01_eda_bias_audit.ipynb  dataset-level bias, and where the processed CSV comes from
+  prototype_tabfm_comparison.ipynb  foundation-model prototype, not a project result
+  tabfm_colab_stage.ipynb  Colab-only staging for the GPU scoring step
 reports/track_comparison.json  the only permitted source of a published number
 MODEL_CARD.md             intended use, limitations, legal position
 ```
+
+The notebooks are checked by `tests/unit/test_notebooks.py`, which fails on a machine-specific
+path, an import of a deleted module or of a package the project does not install, a reference to
+a deleted file, or a stored error output. All four checks were added because the committed
+notebooks violated them: one loaded `/home/aswani/automl/...`, one imported `aif360` which
+`requirements.txt` deliberately excludes, and one shipped a `ModuleNotFoundError` traceback
+under the title "Complete Pipeline Walkthrough". That notebook is deleted; it demonstrated the
+retired pipeline and described a composite fairness objective that never existed in the code.
 
 ---
 
@@ -189,7 +246,7 @@ MODEL_CARD.md             intended use, limitations, legal position
 python -m venv .venv && .venv/Scripts/activate      # Windows
 pip install -r requirements.txt -r requirements-dev.txt
 
-pytest -m "unit or integration"                      # 165 tests
+pytest -m "unit or integration"                      # 186 tests
 python scripts/run_comparison.py --dataset german_credit
 python scripts/generate_report_assets.py
 

@@ -104,3 +104,40 @@ def test_readme_group_counts_match_the_recorded_split(readme: str, artifact: dic
     assert f"{int(german['n_unprivileged'])} women" in readme
     assert f"{int(taiwan['n_privileged']):,} women" in readme
     assert f"{int(taiwan['n_unprivileged']):,} men" in readme
+
+
+def test_dataset_level_claims_recompute_from_the_data(readme: str):
+    """The README's dataset-bias figures are not model results, so they cannot come from the
+    comparison artifact. They are recomputed from the processed CSV instead, so the rule that
+    no published number is typed by hand holds for them too.
+
+    The distinction is the point of finding B1: 0.8966 is a property of the 1,000 recorded
+    outcomes and the model's 0.7263 is a different quantity entirely.
+    """
+    import pandas as pd
+
+    from src.data.registry import GERMAN_CREDIT
+    from src.evaluation.group_fairness import group_fairness
+
+    frame = pd.read_csv(GERMAN_CREDIT.path)
+    sex = next(a for a in GERMAN_CREDIT.protected if a.column == "gender")
+    labels = frame[GERMAN_CREDIT.target].to_numpy()
+
+    # Labels passed as decisions on purpose: this measures the data, not a model.
+    dataset_bias = group_fairness(
+        labels,
+        labels,
+        frame["gender"].to_numpy(),
+        privileged_value=sex.privileged_value,
+        unprivileged_value=sex.unprivileged_value,
+        favorable_label=GERMAN_CREDIT.favorable_label,
+    )
+
+    for value in (
+        dataset_bias.disparate_impact,
+        dataset_bias.privileged.selection_rate,
+        dataset_bias.unprivileged.selection_rate,
+    ):
+        assert f"{value:.4f}" in readme, (
+            f"{value:.4f} is the recomputed dataset-level figure but is absent from the README"
+        )
