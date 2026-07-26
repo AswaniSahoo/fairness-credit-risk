@@ -1,0 +1,113 @@
+{
+  "runs": {
+    "german_credit|T0": {
+      "dataset": "german_credit",
+      "description": "Tuned baseline, no fairness intervention. Optuna search over random forest, XGBoost, LightGBM and logistic regression, selected by cross-validated ROC-AUC on the training block only.",
+      "fairness": {
+        "disparate_impact": 0.7263157894736842,
+        "equal_opportunity_difference": -0.16999999999999993,
+        "equalized_odds_difference": 0.16999999999999993,
+        "fpr_privileged": 0.34210526315789475,
+        "fpr_unprivileged": 0.22727272727272727,
+        "n_privileged": 138.0,
+        "n_unprivileged": 62.0,
+        "selection_rate_privileged": 0.6884057971014492,
+        "selection_rate_unprivileged": 0.5,
+        "statistical_parity_difference": -0.18840579710144922,
+        "tpr_privileged": 0.82,
+        "tpr_unprivileged": 0.65
+      },
+      "intervals": {
+        "balanced_accuracy": {
+          "ci_high": 0.7988095238095239,
+          "ci_low": 0.6678571428571429,
+          "point": 0.7357142857142858
+        },
+        "brier": {
+          "ci_high": 0.19662702419046668,
+          "ci_low": 0.170497898325849,
+          "point": 0.18334168765754622
+        },
+        "disparate_impact": {
+          "ci_high": 0.9106370581879917,
+          "ci_low": 0.5341703629032258,
+          "point": 0.7263157894736842
+        },
+        "equal_opportunity_difference": {
+          "ci_high": -0.015000000000000013,
+          "ci_low": -0.34012499999999996,
+          "point": -0.16999999999999993
+        },
+        "equalized_odds_difference": {
+          "ci_high": 0.37999999999999995,
+          "ci_low": 0.06214593301435406,
+          "point": 0.16999999999999993
+        },
+        "f1": {
+          "ci_high": 0.7058823529411765,
+          "ci_low": 0.5413533834586466,
+          "point": 0.6268656716417911
+        },
+        "recall": {
+          "ci_high": 0.8166666666666667,
+          "ci_low": 0.5833333333333334,
+          "point": 0.7
+        },
+        "roc_auc": {
+          "ci_high": 0.8803660714285714,
+          "ci_low": 0.7724970238095238,
+          "point": 0.8296428571428571
+        },
+        "statistical_parity_difference": {
+          "ci_high": -0.05703599812996718,
+          "ci_low": -0.3319308087891538,
+          "point": -0.18840579710144922
+        }
+      },
+      "model": {
+        "cv_folds": 5,
+        "cv_score": 0.7790343915343916,
+        "model_type": "xgboost",
+        "n_trials": 60,
+        "params": {
+          "colsample_bytree": 0.41326840175945323,
+          "learning_rate": 0.005539555860572883,
+          "max_depth": 5,
+          "min_child_weight": 1,
+          "n_estimators": 350,
+          "reg_alpha": 0.023776828998491078,
+          "reg_lambda": 15.692645577411271,
+          "scale_pos_weight": 2.0322071043988914,
+          "subsample": 0.7221548753079111
+        },
+        "scoring": "roc_auc",
+        "seed": 42
+      },
+      "n_bootstrap": 2000,
+      "n_encoded_features": 47,
+      "performance": {
+        "accuracy": 0.75,
+        "average_precision": 0.6513913690696003,
+        "balanced_accuracy": 0.7357142857142858,
+        "brier": 0.18334168765754622,
+        "f1": 0.6268656716417911,
+        "precision": 0.5675675675675675,
+        "recall": 0.7,
+        "roc_auc": 0.8296428571428571
+      },
+      "protected_attribute": "gender",
+      "provenance": "UCI Statlog German Credit, Hofmann. data/raw/german.data label-encoded alphabetically per code. Mapping asserted in tests/integration/test_german_provenance.py.",
+      "recorded_at": "2026-07-26T15:33:02+00:00",
+      "seed": 42,
+      "split_fingerprint": "5f29293fb76300c1",
+      "split_sizes": {
+        "calibration": 200,
+        "test": 200,
+        "train": 600
+      },
+      "threshold": 0.5,
+      "track": "T0"
+    }
+  },
+  "schema_version": 1
+}
