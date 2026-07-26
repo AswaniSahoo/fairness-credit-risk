@@ -12,3 +12,9 @@ mypy==1.14.1
 # Reads the legacy .xls source of the Taiwan dataset in
 # scripts/convert_taiwan_dataset.py. Not needed at train or serve time.
 xlrd==2.0.1
+
+# Execute the notebooks headlessly. The notebooks are verified by running them, not by
+# reading them: two of them were committed in a state that could not run at all.
+nbformat==5.10.4
+nbclient==0.10.2
+ipykernel==6.29.5
