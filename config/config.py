@@ -1,164 +1,88 @@
-# config/config.py
-"""
-Configuration module for AutoML Fairness-Aware System
-Contains all configuration settings for data processing, model training, and fairness evaluation
+"""Configuration for the fairness-aware credit risk pipeline.
+
+Field defaults use ``default_factory`` because a dataclass instance is unhashable, and
+from Python 3.11 the dataclass machinery rejects such values as bare defaults. The
+previous version raised ``ValueError`` at import time on any interpreter newer than 3.10.
 """
 
-import os
-from dataclasses import dataclass
-from typing import List, Dict, Any
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from src.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR
 
 
 @dataclass
 class DataConfig:
-    """
-    Data-related configuration settings
-    Handles paths, target columns, and preprocessing strategies
-    """
-    
-    # File paths for raw and processed data
-    RAW_DATA_PATH: str = "/home/aswani/automl/data/raw/german.data"
-    PROCESSED_DATA_PATH: str = "/home/aswani/automl/data/processed/german_credit_numerical_final.csv"
-    
-    # Target variable for prediction
+    """Dataset locations, target column, and protected attribute names."""
+
+    RAW_DATA_PATH: Path = RAW_DATA_DIR / "german.data"
+    PROCESSED_DATA_PATH: Path = (
+        PROCESSED_DATA_DIR / "german_credit_numerical_final.csv"
+    )
+
     TARGET_COLUMN: str = "credit_risk"
-    
-    # Protected attributes for fairness evaluation (gender, age, etc.)
-    PROTECTED_ATTRIBUTES: List[str] = None
-    
-    # Strategy to handle class imbalance in dataset
-    # Options: 'smote', 'class_weight', 'undersampling', 'none'
-    CLASS_IMBALANCE_STRATEGY: str = 'class_weight'
-    
-    # Apply fairness-aware preprocessing techniques
+
+    # Held out of the feature matrix and used for fairness measurement only.
+    # See finding B5: `personal_status_sex` also encodes sex and is still a feature,
+    # so excluding `gender` alone does not remove sex from the model.
+    PROTECTED_ATTRIBUTES: list[str] = field(
+        default_factory=lambda: ["gender", "age", "foreign_worker"]
+    )
+
     APPLY_FAIRNESS_PREPROCESSING: bool = True
-    
-    # Method for reweighting samples to mitigate bias
-    # Options: 'aif360' or 'manual'
-    REWEIGHTING_METHOD: str = 'aif360'
-    
-    def __post_init__(self):
-        """Initialize protected attributes if not provided"""
-        if self.PROTECTED_ATTRIBUTES is None:
-            self.PROTECTED_ATTRIBUTES = ['gender', 'age', 'foreign_worker']
 
 
 @dataclass
 class ModelConfig:
-    """
-    Model training and hyperparameter configuration
-    Defines which models to train and their parameter spaces
-    """
-    
-    # List of machine learning models to evaluate
-    MODELS_TO_TRY: List[str] = None
-    
-    # Hyperparameter search space for each model
-    HYPERPARAMETER_SPACE: Dict[str, Any] = None
-    
-    # Weight given to fairness metrics vs performance metrics (0 to 1)
+    """Model families to search and the weight given to fairness in the objective."""
+
+    MODELS_TO_TRY: list[str] = field(
+        default_factory=lambda: [
+            "random_forest",
+            "xgboost",
+            "logistic_regression",
+            "lightgbm",
+        ]
+    )
+
     FAIRNESS_WEIGHT: float = 0.3
-    
-    # Evaluation metrics specifically designed for imbalanced datasets
-    IMBALANCE_METRICS: List[str] = None
-    
-    def __post_init__(self):
-        """Initialize default models and hyperparameter spaces if not provided"""
-        
-        if self.MODELS_TO_TRY is None:
-            self.MODELS_TO_TRY = [
-                'random_forest', 
-                'xgboost', 
-                'logistic_regression', 
-                'lightgbm'
-            ]
-        
-        if self.HYPERPARAMETER_SPACE is None:
-            self.HYPERPARAMETER_SPACE = {
-                'random_forest': {
-                    'n_estimators': [100, 200, 300],
-                    'max_depth': [10, 20, None],
-                    'min_samples_split': [2, 5, 10],
-                    'class_weight': ['balanced', None]
-                },
-                'xgboost': {
-                    'n_estimators': [100, 200, 300],
-                    'max_depth': [3, 6, 9],
-                    'learning_rate': [0.01, 0.1, 0.2],
-                    # scale_pos_weight: ratio of negative to positive class (70/30 = 2.33)
-                    'scale_pos_weight': [1, 2.33]
-                },
-                'logistic_regression': {
-                    'C': [0.01, 0.1, 1.0, 10.0],
-                    'class_weight': ['balanced', None]
-                },
-                'lightgbm': {
-                    'n_estimators': [100, 200, 300],
-                    'max_depth': [3, 6, 9],
-                    'learning_rate': [0.01, 0.1, 0.2],
-                    'class_weight': ['balanced', None]
-                }
-            }
-        
-        if self.IMBALANCE_METRICS is None:
-            self.IMBALANCE_METRICS = [
-                'balanced_accuracy',  # Accuracy adjusted for class imbalance
-                'f1',                 # Harmonic mean of precision and recall
-                'precision',          # True positives / (True positives + False positives)
-                'recall',             # True positives / (True positives + False negatives)
-                'roc_auc',           # Area under ROC curve
-                'average_precision'   # Area under precision-recall curve
-            ]
 
 
 @dataclass
 class FairnessConfig:
-    """
-    Fairness evaluation configuration
-    Defines fairness metrics and threshold values
-    """
-    
-    # Primary protected attribute to focus fairness analysis on
-    PRIMARY_PROTECTED_ATTRIBUTE: str = 'gender'
-    
-    # List of fairness metrics to calculate
-    FAIRNESS_METRICS: List[str] = None
-    
-    # Minimum acceptable ratio for disparate impact (0.8 = 80% rule)
+    """Protected attribute under analysis and the thresholds it is judged against."""
+
+    PRIMARY_PROTECTED_ATTRIBUTE: str = "gender"
+
+    # Privileged group encoding in the processed dataset: 1 = male, 0 = female.
+    PRIVILEGED_VALUE: int = 1
+    UNPRIVILEGED_VALUE: int = 0
+
+    # The favorable outcome is "good credit", encoded as 0 in `credit_risk`.
+    FAVORABLE_LABEL: int = 0
+
+    # Four-fifths rule: a selection-rate ratio below 0.8 is evidence of adverse impact.
     DISPARATE_IMPACT_THRESHOLD: float = 0.8
-    
-    # Maximum acceptable difference in statistical parity
     STATISTICAL_PARITY_THRESHOLD: float = 0.1
-    
-    def __post_init__(self):
-        """Initialize default fairness metrics if not provided"""
-        if self.FAIRNESS_METRICS is None:
-            self.FAIRNESS_METRICS = [
-                'disparate_impact',                # Ratio of favorable outcomes between groups
-                'statistical_parity_difference',   # Difference in positive prediction rates
-                'equal_opportunity_difference'     # Difference in true positive rates
-            ]
 
 
 @dataclass
 class Config:
-    """
-    Main configuration class that combines all config components
-    """
-    
-    data: DataConfig = DataConfig()
-    model: ModelConfig = ModelConfig()
-    fairness: FairnessConfig = FairnessConfig()
-    
-    # Random seed for reproducibility
+    """Top-level configuration aggregate."""
+
+    data: DataConfig = field(default_factory=DataConfig)
+    model: ModelConfig = field(default_factory=ModelConfig)
+    fairness: FairnessConfig = field(default_factory=FairnessConfig)
+
     RANDOM_STATE: int = 42
-    
-    # Proportion of data to use for testing
+
+    # Three-way split: the calibration share is carved out to fit post-processing
+    # without reusing training rows. See finding B4.
     TEST_SIZE: float = 0.2
-    
-    # Number of optimization trials for Optuna hyperparameter search
+    CALIBRATION_SIZE: float = 0.2
+
     N_TRIALS: int = 50
+    CV_FOLDS: int = 3
 
 
-# Global configuration instance - import this in other modules
 config = Config()

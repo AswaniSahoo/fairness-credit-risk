@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   credit-risk-api:
     build: .
@@ -8,13 +6,9 @@ services:
       - "8000:8000"
     volumes:
       - ./artifacts:/app/artifacts:ro
-      - ./api:/app/api:ro
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    # No healthcheck override here: the Dockerfile probe uses `requests`, which is
+    # installed. The previous override called `curl`, which python:*-slim does not ship,
+    # so the container was permanently marked unhealthy.

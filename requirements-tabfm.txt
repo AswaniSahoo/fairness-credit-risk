@@ -1,0 +1,17 @@
+# Optional: the TabFM comparison track (T4). Install on top of requirements.txt.
+#
+# Not required to train, serve, or evaluate the classical tracks. Kept separate because
+# torch plus the 6.56 GB checkpoint is a large cost to impose on every install.
+#
+# The checkpoint is downloaded from https://huggingface.co/google/tabfm-1.0.0-pytorch
+# on first use, into the Hugging Face cache. Budget 6.56 GB of disk.
+#
+# CPU wheels: install torch from the PyTorch CPU index first, then this file.
+#   pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cpu
+#
+# TabFM is not published on PyPI; it installs from the tagged source.
+# Pinned to a commit so the comparison stays reproducible.
+
+torch==2.12.1
+huggingface-hub==1.21.0
+tabfm @ git+https://github.com/google-research/tabfm@603f4dd1312d8cb80eb7cf92e17287b3bceaa8d8

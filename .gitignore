@@ -1,24 +1,47 @@
-cat > .gitignore << 'EOF'
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-automlenv/
-ENV/
 *.egg-info/
 dist/
 build/
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Virtual environments
+env/
+venv/
+.venv/
+automlenv/
+ENV/
 
-# Installers
-*.sh
-Miniconda*.sh
+# Jupyter
+.ipynb_checkpoints/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Model caches. The TabFM checkpoint is 6.56 GB and must never be committed.
+.cache/
+huggingface/
+
+# Downloaded source archives. The Taiwan .xls and its zip are 5.5 MB each and duplicate
+# each other; scripts/convert_taiwan_dataset.py records the URL and asserts the schema, and
+# the converted CSV is committed, so the archives add nothing but weight.
+data/raw/taiwan_credit/
+
+# Fitted track models. Regenerable from a seeded run, and finding R8 showed that committed
+# tree pickles stop loading across scikit-learn versions. The split artifact and the metrics
+# JSON are committed instead, because those are what make a run reproducible.
+artifacts/tracks/
+
+# Machine-specific local utility: hardcodes an absolute Docker VHDX path.
+compact_docker.bat
 
 # IDE
 .vscode/
@@ -30,8 +53,10 @@ Miniconda*.sh
 .DS_Store
 Thumbs.db
 
-# Environment
+# Secrets
 .env
+*.pem
+*.key
 
 # Logs
 *.log
@@ -39,4 +64,3 @@ logs/
 
 # Docker
 docker-compose.override.yml
-EOF

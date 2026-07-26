@@ -1,34 +1,28 @@
-# Dockerfile
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Build toolchain is needed for the boosting library wheels on slim images.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements_api.txt .
+COPY requirements-api.txt .
 
-# Install Python dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --default-timeout=1000 -r requirements_api.txt
+    pip install --default-timeout=1000 -r requirements-api.txt
 
-# Copy application code
 COPY api/ ./api/
 COPY artifacts/ ./artifacts/
 COPY config/ ./config/
 COPY src/ ./src/
 
-# Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+# `requests` is pinned in requirements-api.txt so this probe can actually run, and a
+# non-2xx response must fail the check rather than pass silently.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python -c "import requests, sys; sys.exit(0 if requests.get('http://localhost:8000/health', timeout=5).ok else 1)"
 
-# Run the application
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

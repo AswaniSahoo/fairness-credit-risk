@@ -1,0 +1,14 @@
+# Development tooling. Install on top of requirements.txt and requirements-api.txt.
+
+pytest==8.3.4
+pytest-cov==6.0.0
+
+# FastAPI TestClient transport; the API tests use it instead of a live server.
+httpx==0.28.1
+
+ruff==0.8.6
+mypy==1.14.1
+
+# Reads the legacy .xls source of the Taiwan dataset in
+# scripts/convert_taiwan_dataset.py. Not needed at train or serve time.
+xlrd==2.0.1

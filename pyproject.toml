@@ -1,0 +1,57 @@
+[project]
+name = "fairness-credit-risk"
+version = "0.2.0"
+description = "Fairness-aware credit risk scoring with measured method comparison"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Aswani Sahoo" }]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["src", "api", "config"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "PTH", "RET", "ARG", "T20"]
+# T20 bans print in library code; entry-point scripts opt out below.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# SIM300 misfires on `value == pytest.approx(x)`, which is the documented idiom.
+"tests/*" = ["ARG", "SIM300"]
+# One-shot CLI utilities: stdout IS their interface, so T201 does not apply.
+"scripts/*" = ["T201"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+no_implicit_optional = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["xgboost.*", "lightgbm.*", "optuna.*", "fairlearn.*", "tabfm.*", "seaborn.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "unit: no I/O, milliseconds",
+    "integration: loads artifacts or exercises the app",
+    "slow: trains a model or loads a foundation model checkpoint",
+]
+
+[tool.coverage.run]
+source = ["src", "api"]
+
+[tool.coverage.report]
+show_missing = true

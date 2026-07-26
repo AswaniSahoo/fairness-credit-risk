@@ -1,29 +1,25 @@
-# AutoML GPU Environment (Python 3.10, CUDA 11.8+)
+# Training and evaluation environment. Python >= 3.11.
+#
+# Core versions are aligned with google-research/tabfm so the TabFM comparison track
+# (see .agents/plans/tabfm-integration.md) installs into this same environment.
+#
+# aif360 is deliberately absent: it cannot coexist with numpy 2.x, and the group
+# fairness metrics plus Kamiran-Calders reweighing are implemented in-repo with unit
+# tests instead. See decision C5 in the TabFM integration plan.
 
-# Core Data Handling
-numpy==1.24.3
-pandas==1.5.3
-scipy==1.10.1
+numpy==2.2.0
+pandas==2.2.3
+scipy==1.15.1
+scikit-learn==1.6.0
+joblib==1.4.2
 
-# Machine Learning & AutoML Core (GPU-enabled)
-xgboost==1.7.5
-lightgbm==3.3.5
-scikit-learn==1.2.2
+xgboost==2.1.4
+lightgbm==4.5.0
 
-# Hyperparameter Tuning
-optuna==3.1.1
+optuna==4.1.0
 
-# Fairness & Explainability
-fairlearn==0.7.0
-aif360==0.5.0
-shap==0.41.0
+# Group fairness metrics and the ExponentiatedGradient in-processing reduction.
+fairlearn==0.12.0
 
-# Visualization
-matplotlib==3.7.1
-seaborn==0.12.2
-
-# Web App/API
-flask==2.3.2
-
-# Optional CUDA Toolkit (for GPU acceleration)
-# You can install via conda: conda install -c conda-forge cudatoolkit=11.8
+matplotlib==3.10.0
+seaborn==0.13.2
