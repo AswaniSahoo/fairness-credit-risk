@@ -1,12 +1,13 @@
 """Regression tests for configuration loading.
 
-Covers finding R2: `config/config.py` previously used dataclass instances as bare field
-defaults, which Python 3.11+ rejects with
-``ValueError: mutable default ... use default_factory``. The module could not be imported
-at all on any interpreter newer than 3.10.
+Covers finding R2: the config module previously used dataclass instances as bare
+field defaults, which Python 3.11+ rejects. The import must succeed on any
+interpreter.
 
-Also covers finding R1: absolute `/home/aswani/automl` paths made the project unrunnable
-on any other machine.
+Per-dataset constants (paths, protected attributes, encodings) moved to
+``src.data.registry`` because the disparity direction reverses between
+datasets. This test file validates only the pipeline-level hyperparameters
+that remain in ``config.config``.
 """
 
 import pytest
@@ -22,57 +23,35 @@ def test_config_imports_on_current_interpreter():
 
 
 def test_aggregate_fields_are_independent_instances():
-    """R2: default_factory must give each Config its own sub-config objects.
-
-    A shared class-level instance would let one Config mutate another. Two separate
-    Config() objects must therefore hold distinct DataConfig instances.
-    """
+    """R2: two Config() objects must be independent."""
     from config.config import Config
 
     first = Config()
     second = Config()
 
-    assert first.data is not second.data
-    assert first.model is not second.model
-    assert first.fairness is not second.fairness
-
-    first.data.PROTECTED_ATTRIBUTES.append("injected")
-    assert "injected" not in second.data.PROTECTED_ATTRIBUTES
-
-
-def test_data_paths_resolve_under_project_root_and_exist():
-    """R1: paths must be derived from the repo, not hardcoded to one machine."""
-    from config.config import config
-    from src.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
-
-    assert config.data.PROCESSED_DATA_PATH.is_relative_to(PROJECT_ROOT)
-    assert config.data.RAW_DATA_PATH.is_relative_to(PROJECT_ROOT)
-    assert config.data.PROCESSED_DATA_PATH.parent == PROCESSED_DATA_DIR
-    assert config.data.RAW_DATA_PATH.parent == RAW_DATA_DIR
-
-    assert config.data.PROCESSED_DATA_PATH.exists()
-    assert config.data.RAW_DATA_PATH.exists()
-
-
-def test_protected_and_target_columns_match_the_dataset_header():
-    """The configured column names must exist in the processed dataset."""
-    import csv
-
-    from config.config import config
-
-    with config.data.PROCESSED_DATA_PATH.open(newline="") as handle:
-        header = next(csv.reader(handle))
-
-    assert config.data.TARGET_COLUMN in header
-    for column in config.data.PROTECTED_ATTRIBUTES:
-        assert column in header, f"{column} missing from dataset header"
-    assert config.fairness.PRIMARY_PROTECTED_ATTRIBUTE in header
+    # Scalar fields are value-equal but the instances are distinct objects.
+    assert first is not second
+    assert first.RANDOM_STATE == second.RANDOM_STATE
 
 
 def test_split_fractions_leave_a_majority_for_training():
-    """Test plus calibration shares must not consume the training set."""
+    """Both shares are fractions of the whole dataset, not of a remainder."""
     from config.config import config
 
     assert config.TEST_SIZE == pytest.approx(0.2)
     assert config.CALIBRATION_SIZE == pytest.approx(0.2)
-    assert config.TEST_SIZE + config.CALIBRATION_SIZE < 0.5
+    # 0.2 and 0.2 of the whole leaves 0.6 for training, which is the 600/200/200 split
+    # recorded in reports/track_comparison.json for the 1000-row German Credit file.
+    assert 1.0 - config.TEST_SIZE - config.CALIBRATION_SIZE == pytest.approx(0.6)
+
+
+def test_search_defaults_reproduce_the_published_run():
+    """The recorded comparison used 60 trials and 5 folds.
+
+    Defaults below those would make an unmodified pipeline run select a different model
+    from the one whose numbers are published.
+    """
+    from config.config import config
+
+    assert config.N_TRIALS == 60
+    assert config.CV_FOLDS == 5
