@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.schemas.prediction import (
     CreditApplicationRequest,
+    ExplainResponse,
     HealthResponse,
     PredictionResponse,
 )
@@ -55,10 +56,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG001
 app = FastAPI(
     title="Credit Risk Scoring API",
     description=(
-        "Single-threshold credit risk prediction. No authentication is provided; "
-        "deploy behind an authenticating proxy before exposing publicly."
+        "Single-threshold credit risk prediction with SHAP-based adverse-action "
+        "reason codes. No authentication is provided; deploy behind an "
+        "authenticating proxy before exposing publicly."
     ),
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -89,11 +91,29 @@ async def health() -> HealthResponse:
 
 
 @app.post("/predict", response_model=PredictionResponse)
-async def predict(request: CreditApplicationRequest) -> PredictionResponse:
+async def predict(
+    request: CreditApplicationRequest,
+    include_reasons: bool = False,
+) -> PredictionResponse:
+    """Score an applicant. Set ``include_reasons=true`` for SHAP-based adverse-action
+    reason codes on declined applications."""
     if _predictor is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
-    result = _predictor.predict(request.model_dump())
+    result = _predictor.predict(request.model_dump(), include_reasons=include_reasons)
     return PredictionResponse(**result)
+
+
+@app.post("/explain", response_model=ExplainResponse)
+async def explain(request: CreditApplicationRequest) -> ExplainResponse:
+    """Score and explain, regardless of decision.
+
+    Always returns reason codes, including for approved applicants. Intended for model
+    monitoring and internal audit, not for applicant-facing notices.
+    """
+    if _predictor is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    result = _predictor.explain(request.model_dump())
+    return ExplainResponse(**result)
 
 
 @app.get("/metrics")

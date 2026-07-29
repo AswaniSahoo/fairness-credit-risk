@@ -156,7 +156,7 @@ if st.button("Score applicant"):
         "telephone": telephone,
     }
 
-    result = predictor.predict(applicant)
+    result = predictor.predict(applicant, include_reasons=True)
 
     st.divider()
     c1, c2, c3 = st.columns(3)
@@ -168,3 +168,18 @@ if st.button("Score applicant"):
         st.success("Loan likely to be approved under the model's threshold.")
     else:
         st.warning("Loan likely to be declined under the model's threshold.")
+
+        reason_codes = result.get("reason_codes")
+        if reason_codes:
+            st.subheader("Adverse-Action Reasons")
+            st.caption(
+                "Principal factors that contributed to the decline, per "
+                "Regulation B (12 CFR 1002.9)."
+            )
+            for i, reason in enumerate(reason_codes, 1):
+                direction_icon = "🔴" if reason["direction"] == "increases risk" else "🟢"
+                st.markdown(
+                    f"**{i}.** {direction_icon} {reason['contribution']}  \n"
+                    f"&nbsp;&nbsp;&nbsp;&nbsp;*Feature: {reason['feature']}, "
+                    f"SHAP: {reason['shap_value']:+.4f}*"
+                )

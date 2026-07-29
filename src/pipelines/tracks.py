@@ -66,8 +66,19 @@ from src.evaluation.performance import (
     performance_metrics,
     stratified_bootstrap_indices,
 )
+from src.evaluation.explanations import (
+    build_explainer,
+    explain_batch,
+    global_feature_importance,
+    sample_background,
+)
 from src.paths import ARTIFACTS_DIR, REPORTS_DIR
-from src.preprocessing.features import extract_features, extract_groups, extract_target
+from src.preprocessing.features import (
+    encoded_feature_names,
+    extract_features,
+    extract_groups,
+    extract_target,
+)
 from src.preprocessing.reweighing import reweighing_weights
 from src.training.search import (
     POSITIVE_CLASS,
@@ -109,6 +120,7 @@ class TrackRun:
     matched: dict[str, Any] | None
     protected_attribute: str
     n_bootstrap: int
+    feature_importance: list[dict[str, Any]] | None
     provenance: str
     recorded_at: str = field(
         default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds")
@@ -122,8 +134,8 @@ class TrackRun:
                 "deployable", "deployability_note", "search_note", "seed", "threshold",
                 "selection_rate", "split_sizes", "split_fingerprint",
                 "n_encoded_features", "model", "performance", "fairness", "intervals",
-                "matched", "protected_attribute", "n_bootstrap", "provenance",
-                "recorded_at",
+                "matched", "protected_attribute", "n_bootstrap", "feature_importance",
+                "provenance", "recorded_at",
             )
         }
 
@@ -229,6 +241,7 @@ def _assemble_run(
     n_bootstrap: int,
     threshold: float | None,
     reference_selection_rate: float | None,
+    feature_importance: list[dict[str, Any]] | None = None,
 ) -> TrackRun:
     """Build a run record. Every track goes through this function, and only this function."""
     performance = performance_metrics(y_true, y_pred, scores, positive_class=POSITIVE_CLASS)
@@ -270,6 +283,7 @@ def _assemble_run(
         matched=matched,
         protected_attribute=spec.protected_attribute().column,
         n_bootstrap=n_bootstrap,
+        feature_importance=feature_importance,
         provenance=spec.provenance,
     )
 
@@ -321,6 +335,33 @@ def load_inputs(
     )
 
 
+def _compute_shap_importance(
+    estimator: Any,
+    X_train: pd.DataFrame,
+    seed: int,
+) -> tuple[list[dict[str, Any]], NDArray[np.float64]]:
+    """Compute global SHAP feature importance and a background sample.
+
+    Returns:
+        A tuple of (feature_importance list for the run record, background array for the
+        track artifact).
+    """
+    feature_names = encoded_feature_names(estimator)
+    X_train_encoded = np.asarray(
+        estimator.named_steps["encoder"].transform(X_train), dtype=np.float64
+    )
+    background = sample_background(X_train_encoded, seed=seed)
+    explainer = build_explainer(estimator, background)
+    shap_values = explain_batch(explainer, X_train_encoded, feature_names)
+    importance = global_feature_importance(shap_values, feature_names)
+    logger.info(
+        "SHAP importance computed: top feature %s (mean |SHAP| %.4f)",
+        importance[0]["feature"] if importance else "n/a",
+        importance[0]["mean_abs_shap"] if importance else 0.0,
+    )
+    return importance, background
+
+
 def run_baseline_track(
     spec: DatasetSpec,
     inputs: TrackInputs,
@@ -330,7 +371,7 @@ def run_baseline_track(
     cv_folds: int,
     n_bootstrap: int,
     threshold: float = DEFAULT_THRESHOLD,
-) -> tuple[TrackRun, Any, SearchResult]:
+) -> tuple[TrackRun, Any, SearchResult, NDArray[np.float64]]:
     """T0: tuned model, no fairness intervention. The control."""
     search = run_search(
         spec, inputs.X_train, inputs.y_train, n_trials=n_trials, cv_folds=cv_folds, seed=seed
@@ -339,6 +380,8 @@ def run_baseline_track(
 
     scores = positive_class_probabilities(estimator, inputs.X_test)
     y_pred = predict_at_threshold(scores, threshold, favorable_label=spec.favorable_label)
+
+    importance, background = _compute_shap_importance(estimator, inputs.X_train, seed)
 
     run = _assemble_run(
         spec,
@@ -367,8 +410,9 @@ def run_baseline_track(
         n_bootstrap=n_bootstrap,
         threshold=threshold,
         reference_selection_rate=None,
+        feature_importance=importance,
     )
-    return run, estimator, search
+    return run, estimator, search, background
 
 
 def run_reweighing_track(
@@ -411,6 +455,8 @@ def run_reweighing_track(
     scores = positive_class_probabilities(estimator, inputs.X_test)
     y_pred = predict_at_threshold(scores, threshold, favorable_label=spec.favorable_label)
 
+    importance, background = _compute_shap_importance(estimator, inputs.X_train, seed)
+
     weights = reweighing_weights(inputs.y_train, inputs.groups_train)
     summary = {
         **search.summary(),
@@ -444,8 +490,9 @@ def run_reweighing_track(
         n_bootstrap=n_bootstrap,
         threshold=threshold,
         reference_selection_rate=reference_selection_rate,
+        feature_importance=importance,
     )
-    return run, estimator, search
+    return run, estimator, search, background
 
 
 EPSILON_GRID = (0.02, 0.05, 0.10)
@@ -792,11 +839,24 @@ def run_threshold_track(
     return run, postprocessor
 
 
-def save_track_model(spec: DatasetSpec, run: TrackRun, model: Any) -> Path:
-    """Persist a fitted track model next to the run record that describes it."""
+def save_track_model(
+    spec: DatasetSpec,
+    run: TrackRun,
+    model: Any,
+    background: NDArray[np.float64] | None = None,
+) -> Path:
+    """Persist a fitted track model next to the run record that describes it.
+
+    ``background`` is a subsampled encoded training block used by the SHAP explainer at
+    inference time. Including it in the artifact means serving does not need the full
+    training data.
+    """
     path = ARTIFACTS_DIR / "tracks" / f"{spec.name}_{run.track}.joblib"
     path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"model": model, "run": run.to_dict()}, path)
+    artifact: dict[str, Any] = {"model": model, "run": run.to_dict()}
+    if background is not None:
+        artifact["background"] = background
+    joblib.dump(artifact, path)
     logger.info("model written to %s", path)
     return path
 

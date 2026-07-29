@@ -80,6 +80,15 @@ class CreditApplicationRequest(BaseModel):
     }
 
 
+class ReasonCodeResponse(BaseModel):
+    """One line of an adverse-action notice."""
+
+    feature: str
+    shap_value: float
+    direction: str
+    contribution: str
+
+
 class PredictionResponse(BaseModel):
     """Decision returned by POST /predict."""
 
@@ -88,6 +97,18 @@ class PredictionResponse(BaseModel):
     threshold: float
     track: str
     dataset: str
+    reason_codes: list[ReasonCodeResponse] | None = None
+
+
+class ExplainResponse(BaseModel):
+    """Decision with reason codes, returned by POST /explain."""
+
+    probability_of_default: float = Field(..., ge=0.0, le=1.0)
+    decision: Literal["approve", "decline"]
+    threshold: float
+    track: str
+    dataset: str
+    reason_codes: list[ReasonCodeResponse]
 
 
 class HealthResponse(BaseModel):
