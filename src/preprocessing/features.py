@@ -104,13 +104,47 @@ def build_encoder(spec: DatasetSpec) -> Pipeline:
     )
 
 
-def encoded_feature_names(encoder: Pipeline) -> list[str]:
+def encoded_feature_names(pipeline: Pipeline) -> list[str]:
     """Column names of the encoded matrix, for coefficient and SHAP reporting.
+
+    Accepts either the encoder pipeline itself or the full fitted estimator that carries it
+    as its ``encoder`` step. Both are passed by callers holding a fitted model, and requiring
+    the caller to remember which one produced a bare ``KeyError: 'encode'`` from three
+    separate call sites during the SHAP work. Descending one named step is unambiguous, so
+    the function does it rather than making every caller do it.
+
+    Raises:
+        ValueError: If neither an ``encode`` step nor an ``encoder`` step is present.
+        AttributeError: If the encoder has not been fitted.
+    """
+    return list(_encode_step(pipeline).get_feature_names_out())
+
+
+def _encode_step(pipeline: Pipeline) -> ColumnTransformer:
+    """The fitted ColumnTransformer, given the encoder pipeline or the full estimator."""
+    steps = pipeline.named_steps
+    if "encode" not in steps and "encoder" in steps:
+        steps = pipeline.named_steps["encoder"].named_steps
+    if "encode" not in steps:
+        raise ValueError(
+            f"no 'encode' step in {list(pipeline.named_steps)}; expected the encoder "
+            "pipeline or an estimator with an 'encoder' step"
+        )
+    return steps["encode"]
+
+
+def indicator_feature_names(pipeline: Pipeline) -> frozenset[str]:
+    """Encoded columns produced by the one-hot branch, so 0 and 1 mean absent and present.
+
+    A reason code for one of these columns must say whether the category applied to the
+    application. Without that, a positive attribution on an absent category reads as though
+    the applicant held it, which would misstate a principal reason under Regulation B.
 
     Raises:
         AttributeError: If the encoder has not been fitted.
     """
-    return list(encoder.named_steps["encode"].get_feature_names_out())
+    onehot = _encode_step(pipeline).named_transformers_["onehot"]
+    return frozenset(str(name) for name in onehot.get_feature_names_out())
 
 
 def extract_features(spec: DatasetSpec, frame: pd.DataFrame) -> pd.DataFrame:

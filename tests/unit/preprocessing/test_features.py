@@ -177,3 +177,38 @@ def test_taiwan_folds_undocumented_codes_inside_the_pipeline():
     assert encoded[0, marriage_3] == 1.0
     # 14 numeric + 6 ordinal scaled, 4 EDUCATION + 3 MARRIAGE one-hot.
     assert encoded.shape == (2, 14 + 6 + 4 + 3)
+
+
+def test_encoded_feature_names_accepts_the_encoder_or_the_full_estimator(german):
+    """Both call shapes must agree, because callers hold one or the other.
+
+    Three call sites during the SHAP work passed the fitted estimator to a function that
+    expected only its encoder step, and each failed with a bare KeyError: 'encode'.
+    """
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import Pipeline
+
+    features = extract_features(GERMAN_CREDIT, german)
+    target = extract_target(GERMAN_CREDIT, german)
+
+    estimator = Pipeline([
+        ("encoder", build_encoder(GERMAN_CREDIT)),
+        ("classifier", LogisticRegression(max_iter=1000, random_state=42)),
+    ]).fit(features, target)
+
+    from_estimator = encoded_feature_names(estimator)
+    from_encoder = encoded_feature_names(estimator.named_steps["encoder"])
+
+    assert from_estimator == from_encoder
+    assert len(from_estimator) == GERMAN_ENCODED_WIDTH
+
+
+def test_encoded_feature_names_rejects_a_pipeline_with_neither_step():
+    """A pipeline carrying no encoder must say so, not raise KeyError from inside sklearn."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import Pipeline
+
+    pipeline = Pipeline([("classifier", LogisticRegression())])
+
+    with pytest.raises(ValueError, match="no 'encode' step"):
+        encoded_feature_names(pipeline)
