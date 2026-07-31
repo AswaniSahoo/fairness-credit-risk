@@ -5,7 +5,7 @@ two datasets. The interesting result is that none of them helped much, and the r
 different for each.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-186%20passing-green.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-212%20passing-green.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Every number in this README is generated from [`reports/track_comparison.json`](reports/track_comparison.json)
@@ -205,6 +205,36 @@ comparisons are paired.
 
 ---
 
+## Adverse-action reason codes
+
+Regulation B (12 CFR 1002.9) requires a lender to state the principal reasons for a decline.
+A score without them is not a lending decision anyone can send. `POST /predict` with
+`include_reasons=true` returns up to four, ranked by absolute SHAP contribution:
+
+```
+decision=decline  P(default)=0.6549  threshold=0.5000
+  1. status_0    shap=+0.0567  status_0 applied to this application and pushed the risk score higher
+  2. status_3    shap=+0.0441  status_3 did not apply to this application, and its absence
+                               pushed the risk score higher
+  3. duration    shap=+0.0210  duration pushed the risk score higher
+  4. amount      shap=+0.0198  amount pushed the risk score higher
+```
+
+The second line is the part worth noticing. `status_3` is a one-hot column the applicant does
+not hold, and its absence is genuinely what raised the score: not having the strongest
+checking-account status is a real reason to decline. Phrasing it as "status 3 pushed the risk
+score higher" would tell the applicant they were declined for a status they never had, which
+misstates a principal reason. The distinction is enforced by a test, not by convention.
+
+Attributions are computed on the encoded matrix against the classifier step, so an explanation
+cannot disagree with the prediction it accompanies. Approvals return no reason codes, because
+ECOA requires them for adverse action and returning them on an approval invites reading them as
+an eligibility explanation. Cost is 0.0231 s per decision against 0.0043 s without. Feature
+names are encoded column names, not applicant-facing prose; that mapping is a product step this
+repository does not take. Full contract in [MODEL_CARD.md](MODEL_CARD.md).
+
+---
+
 ## Repository layout
 
 ```
@@ -246,7 +276,7 @@ retired pipeline and described a composite fairness objective that never existed
 python -m venv .venv && .venv/Scripts/activate      # Windows
 pip install -r requirements.txt -r requirements-dev.txt
 
-pytest -m "unit or integration"                      # 186 tests
+pytest -m "unit or integration"                      # 212 tests
 python scripts/run_comparison.py --dataset german_credit
 python scripts/generate_report_assets.py
 

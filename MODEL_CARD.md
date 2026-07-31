@@ -119,6 +119,35 @@ The encoder enforces this: prohibited-basis columns cannot enter the pipeline by
 - **No authentication.** Any caller who can reach the service can score an applicant. It must
   not be exposed publicly without an auth layer in front of it.
 
+## Adverse-Action Reason Codes
+
+Regulation B (12 CFR 1002.9) requires a creditor to state the principal reasons for an adverse
+action. `POST /predict` with `include_reasons=true` returns up to four reason codes on a
+decline, ranked by absolute SHAP contribution. `Predictor.explain` returns them for any
+decision and is intended for audit, not for applicant notices.
+
+- **Computed on the encoded matrix**, against the classifier step of the fitted pipeline, so
+  the explanation is of the surface the model actually decides on and cannot disagree with the
+  prediction it accompanies. Values are for the positive class, which is default.
+- **`TreeExplainer` with `model_output="probability"`** for the tree families, against a
+  200-row background sample stored inside the track artifact. `KernelExplainer` over a kmeans
+  summary for logistic regression.
+- **One-hot columns state whether the category applied.** A positive attribution on a category
+  the applicant does not hold is normal and meaningful — not holding the strongest
+  checking-account status raises the score — so the notice says the category "did not apply"
+  rather than naming it as though the applicant held it. Reporting an absent category as
+  present would misstate a principal reason.
+- **Feature names are encoded column names** such as `status_3`, not applicant-facing prose.
+  Mapping them to the sentences a real notice would carry is a product step this repository
+  does not take.
+- **Approvals carry no reason codes.** ECOA requires them for adverse action; returning them
+  on an approval would invite treating them as an eligibility explanation.
+- **Cost, measured on German Credit T0**: 0.0231 s per decision with reasons against 0.0043 s
+  without, plus roughly 1.1 s once per process to build the explainer on first use.
+- **Global feature importance** in each run record is the mean absolute SHAP value over a
+  500-row sample of the training block, not the whole block. It is a diagnostic, not a
+  published headline metric; no reported performance or fairness number depends on it.
+
 ## Second Dataset
 
 The same four tracks were run on the Taiwan credit card default dataset (UCI 350, 30,000 rows),
