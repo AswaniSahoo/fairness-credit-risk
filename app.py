@@ -177,9 +177,9 @@ if st.button("Score applicant"):
                 "Regulation B (12 CFR 1002.9)."
             )
             for i, reason in enumerate(reason_codes, 1):
-                direction_icon = "🔴" if reason["direction"] == "increases risk" else "🟢"
                 st.markdown(
-                    f"**{i}.** {direction_icon} {reason['contribution']}  \n"
+                    f"**{i}.** {reason['contribution']}  \n"
                     f"&nbsp;&nbsp;&nbsp;&nbsp;*Feature: {reason['feature']}, "
+                    f"direction: {reason['direction']}, "
                     f"SHAP: {reason['shap_value']:+.4f}*"
                 )
