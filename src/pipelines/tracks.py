@@ -55,6 +55,13 @@ from sklearn.metrics import (
 
 from src.data.registry import DatasetSpec
 from src.data.splits import DataSplit, get_or_create_split
+from src.evaluation.explanations import (
+    IMPORTANCE_SAMPLE_SIZE,
+    build_explainer,
+    explain_batch,
+    global_feature_importance,
+    sample_background,
+)
 from src.evaluation.group_fairness import (
     FairnessResult,
     group_fairness,
@@ -65,12 +72,6 @@ from src.evaluation.performance import (
     bootstrap_interval,
     performance_metrics,
     stratified_bootstrap_indices,
-)
-from src.evaluation.explanations import (
-    build_explainer,
-    explain_batch,
-    global_feature_importance,
-    sample_background,
 )
 from src.paths import ARTIFACTS_DIR, REPORTS_DIR
 from src.preprocessing.features import (
@@ -335,27 +336,43 @@ def load_inputs(
     )
 
 
-def _compute_shap_importance(
+def compute_shap_importance(
     estimator: Any,
     X_train: pd.DataFrame,
     seed: int,
 ) -> tuple[list[dict[str, Any]], NDArray[np.float64]]:
     """Compute global SHAP feature importance and a background sample.
 
+    Public because ``scripts/backfill_shap_background.py`` fills this in for artifacts
+    fitted before the field existed. Sharing one function is what makes the backfilled
+    value equal to the value a fresh run would have written; a second implementation
+    would only look equivalent.
+
+    Importance is estimated from ``IMPORTANCE_SAMPLE_SIZE`` training rows rather than the
+    whole block, because interventional SHAP cost is linear in rows and the quantity is a
+    per-feature mean. The explained rows are drawn under a different seed from the
+    background rows so the reference distribution is not the sample being explained.
+
     Returns:
         A tuple of (feature_importance list for the run record, background array for the
         track artifact).
     """
-    feature_names = encoded_feature_names(estimator)
-    X_train_encoded = np.asarray(
-        estimator.named_steps["encoder"].transform(X_train), dtype=np.float64
-    )
+    encoder = estimator.named_steps["encoder"]
+    feature_names = encoded_feature_names(encoder)
+    X_train_encoded = np.asarray(encoder.transform(X_train), dtype=np.float64)
+
     background = sample_background(X_train_encoded, seed=seed)
+    explained = sample_background(
+        X_train_encoded, n_samples=IMPORTANCE_SAMPLE_SIZE, seed=seed + 1
+    )
+
     explainer = build_explainer(estimator, background)
-    shap_values = explain_batch(explainer, X_train_encoded, feature_names)
+    shap_values = explain_batch(explainer, explained, feature_names)
     importance = global_feature_importance(shap_values, feature_names)
     logger.info(
-        "SHAP importance computed: top feature %s (mean |SHAP| %.4f)",
+        "SHAP importance over %d of %d training rows: top feature %s (mean |SHAP| %.4f)",
+        len(explained),
+        len(X_train_encoded),
         importance[0]["feature"] if importance else "n/a",
         importance[0]["mean_abs_shap"] if importance else 0.0,
     )
@@ -381,7 +398,7 @@ def run_baseline_track(
     scores = positive_class_probabilities(estimator, inputs.X_test)
     y_pred = predict_at_threshold(scores, threshold, favorable_label=spec.favorable_label)
 
-    importance, background = _compute_shap_importance(estimator, inputs.X_train, seed)
+    importance, background = compute_shap_importance(estimator, inputs.X_train, seed)
 
     run = _assemble_run(
         spec,
@@ -425,7 +442,7 @@ def run_reweighing_track(
     n_bootstrap: int,
     reference_selection_rate: float,
     threshold: float = DEFAULT_THRESHOLD,
-) -> tuple[TrackRun, Any, SearchResult]:
+) -> tuple[TrackRun, Any, SearchResult, NDArray[np.float64]]:
     """T1: Kamiran-Calders reweighing, computed inside each training fold.
 
     The weights are recomputed from the rows of each training fold rather than once over the
@@ -455,7 +472,7 @@ def run_reweighing_track(
     scores = positive_class_probabilities(estimator, inputs.X_test)
     y_pred = predict_at_threshold(scores, threshold, favorable_label=spec.favorable_label)
 
-    importance, background = _compute_shap_importance(estimator, inputs.X_train, seed)
+    importance, background = compute_shap_importance(estimator, inputs.X_train, seed)
 
     weights = reweighing_weights(inputs.y_train, inputs.groups_train)
     summary = {
@@ -745,6 +762,9 @@ def run_constrained_track(
         # two-valued score cannot be re-thresholded, so the comparison is omitted rather than
         # reported as if it meant something.
         reference_selection_rate=reference_selection_rate if n_unique_scores > 2 else None,
+        # T2 is a randomised ensemble; per-feature SHAP is not well-defined for the mixture.
+        # T0's feature importance applies to the base learner, which is the same model.
+        feature_importance=None,
     )
     return run, mitigator
 
@@ -835,6 +855,8 @@ def run_threshold_track(
         # No single global threshold exists; the cut-off depends on the applicant's group.
         threshold=None,
         reference_selection_rate=None,
+        # T3 wraps T0's model unchanged; T0's feature importance applies directly.
+        feature_importance=None,
     )
     return run, postprocessor
 

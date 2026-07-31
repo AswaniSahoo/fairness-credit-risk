@@ -90,20 +90,20 @@ def main() -> int:
 
     baseline_run = baseline_estimator = baseline_search = None
     if "T0" in wanted:
-        baseline_run, baseline_estimator, baseline_search = run_baseline_track(
+        baseline_run, baseline_estimator, baseline_search, background = run_baseline_track(
             spec, inputs, **shared, **searched
         )
-        save_track_model(spec, baseline_run, baseline_estimator)
+        save_track_model(spec, baseline_run, baseline_estimator, background=background)
         record_run(baseline_run)
         report(baseline_run)
 
     reference_rate = baseline_run.selection_rate if baseline_run else None
 
     if "T1" in wanted:
-        run, estimator, _ = run_reweighing_track(
+        run, estimator, _, bg = run_reweighing_track(
             spec, inputs, **shared, **searched, reference_selection_rate=reference_rate
         )
-        save_track_model(spec, run, estimator)
+        save_track_model(spec, run, estimator, background=bg)
         record_run(run)
         report(run)
 
