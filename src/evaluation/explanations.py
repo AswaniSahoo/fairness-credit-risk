@@ -25,12 +25,15 @@ differentiable, and SHAP's masking assumptions do not hold for one-hot blocks).
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 from sklearn.pipeline import Pipeline
+
+from src.training.search import POSITIVE_CLASS
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,13 @@ DEFAULT_N_REASONS = 4
 # Number of background rows kept for inference-time explanations. Enough for a stable
 # expected value without shipping the full training block.
 BACKGROUND_SAMPLE_SIZE = 200
+
+# Rows explained when estimating global feature importance. Interventional TreeExplainer
+# costs O(rows x background rows x trees): measured at 0.019 s/row on the Taiwan LightGBM,
+# so explaining all 18,000 training rows takes 350 s per track against 10 s for this sample.
+# Mean absolute SHAP is an average over rows, so the extra precision buys nothing a ranking
+# would show.
+IMPORTANCE_SAMPLE_SIZE = 500
 
 _TREE_TYPES = frozenset({
     "RandomForestClassifier",
@@ -111,6 +121,39 @@ def build_explainer(
     return shap.KernelExplainer(classifier.predict_proba, summary)
 
 
+def _positive_class_shap(raw: Any, n_features: int) -> NDArray[np.float64]:
+    """Reduce any SHAP return shape to positive-class values of shape (n_rows, n_features).
+
+    shap 0.46 returns one ``(n_rows, n_features, n_classes)`` array for a binary classifier;
+    earlier versions returned a list holding one array per class. Both shapes are handled
+    here rather than at each call site, because the two failure modes differ and only one of
+    them is loud: flattening the 3-D array raises on the width check, while passing it
+    through unreduced satisfies a ``shape[1]`` check and yields a 3-D array that
+    ``global_feature_importance`` then ranks as though it were per-feature.
+
+    Column ``POSITIVE_CLASS`` is the default class. ``classes_`` is sorted ascending and is
+    asserted against that constant in ``src.training.search``, so index and label agree.
+
+    Raises:
+        ValueError: If the reduced width does not match ``n_features``.
+    """
+    if isinstance(raw, list):
+        values = np.asarray(raw[POSITIVE_CLASS], dtype=np.float64)
+    else:
+        values = np.asarray(raw, dtype=np.float64)
+        if values.ndim == 3:
+            values = values[:, :, POSITIVE_CLASS]
+
+    values = np.atleast_2d(values)
+
+    if values.ndim != 2 or values.shape[1] != n_features:
+        raise ValueError(
+            f"SHAP values reduced to shape {values.shape}, expected (n_rows, {n_features}). "
+            f"Raw SHAP output had shape {np.asarray(raw).shape}."
+        )
+    return values
+
+
 def _direction_label(shap_value: float) -> str:
     """Human-readable direction for a SHAP contribution to the default score."""
     if shap_value > 0:
@@ -120,14 +163,34 @@ def _direction_label(shap_value: float) -> str:
     return "neutral"
 
 
-def _contribution_sentence(feature: str, direction: str) -> str:
-    """Plain-language reason for an adverse-action notice."""
-    clean = feature.replace("_", " ")
-    if direction == "increases risk":
-        return f"{clean} pushed the risk score higher"
-    if direction == "decreases risk":
-        return f"{clean} pushed the risk score lower"
-    return f"{clean} had no effect on the risk score"
+def _contribution_sentence(
+    feature: str,
+    direction: str,
+    *,
+    value: float | None = None,
+    is_indicator: bool = False,
+) -> str:
+    """Plain-language reason for an adverse-action notice.
+
+    One-hot columns are phrased by whether the category applied to this application. A
+    positive attribution on an absent category is common and meaningful - not holding the
+    best checking-account status raises the score - but stating it as though the applicant
+    held that status would misstate a principal reason under Regulation B.
+    """
+    if direction == "neutral":
+        return f"{feature} had no effect on the risk score"
+
+    push = "higher" if direction == "increases risk" else "lower"
+
+    if is_indicator:
+        if value is not None and value >= 0.5:
+            return f"{feature} applied to this application and pushed the risk score {push}"
+        return (
+            f"{feature} did not apply to this application, and its absence pushed the "
+            f"risk score {push}"
+        )
+
+    return f"{feature.replace('_', ' ')} pushed the risk score {push}"
 
 
 def explain_single(
@@ -136,12 +199,18 @@ def explain_single(
     feature_names: list[str],
     *,
     n_reasons: int = DEFAULT_N_REASONS,
+    indicator_features: Collection[str] = (),
 ) -> list[ReasonCode]:
     """Top-N reason codes for a single applicant.
 
     ``encoded_row`` is a 1-D or 2-D array of the encoded features for one row.
     SHAP values are for the positive class (default), so a positive value means the
     feature pushed the model toward predicting default.
+
+    ``indicator_features`` names the one-hot columns, from
+    ``src.preprocessing.features.indicator_feature_names``. Reason codes for those columns
+    are phrased by whether the category applied to this application, because an attribution
+    on an absent category otherwise reads as though the applicant held it.
 
     Returns:
         A list of ``ReasonCode`` sorted by descending absolute SHAP value, length
@@ -152,47 +221,34 @@ def explain_single(
     row = np.atleast_2d(encoded_row)
 
     if isinstance(explainer, shap.TreeExplainer):
-        shap_values = explainer.shap_values(row, check_additivity=False)
-        # TreeExplainer with model_output="probability" returns an array per row.
-        # For binary classification it may return a list of two arrays (one per class)
-        # or a single array. We want the positive-class (index 1) contributions.
-        if isinstance(shap_values, list):
-            values = np.asarray(shap_values[1]).ravel()
-        else:
-            values = np.asarray(shap_values).ravel()
+        raw = explainer.shap_values(row, check_additivity=False)
     else:
-        # KernelExplainer returns [n_samples, n_features, n_classes] or
-        # [n_samples, n_features] depending on the model.
-        shap_values = explainer.shap_values(row, silent=True)
-        if isinstance(shap_values, list):
-            values = np.asarray(shap_values[1]).ravel()
-        else:
-            arr = np.asarray(shap_values)
-            if arr.ndim == 3:
-                values = arr[0, :, 1]
-            else:
-                values = arr.ravel()
+        raw = explainer.shap_values(row, silent=True)
 
-    if values.shape[0] != len(feature_names):
-        raise ValueError(
-            f"SHAP values length {values.shape[0]} does not match "
-            f"feature_names length {len(feature_names)}"
-        )
+    values = _positive_class_shap(raw, len(feature_names))[0]
 
     # Sort by absolute contribution, descending.
     ranked = np.argsort(-np.abs(values))
     count = min(n_reasons, len(feature_names))
 
+    indicators = frozenset(indicator_features)
+
     reasons: list[ReasonCode] = []
     for idx in ranked[:count]:
+        name = feature_names[idx]
         sv = float(values[idx])
         direction = _direction_label(sv)
         reasons.append(
             ReasonCode(
-                feature=feature_names[idx],
+                feature=name,
                 shap_value=sv,
                 direction=direction,
-                contribution=_contribution_sentence(feature_names[idx], direction),
+                contribution=_contribution_sentence(
+                    name,
+                    direction,
+                    value=float(row[0, idx]),
+                    is_indicator=name in indicators,
+                ),
             )
         )
     return reasons
@@ -211,26 +267,15 @@ def explain_batch(
     import shap
 
     if isinstance(explainer, shap.TreeExplainer):
-        shap_values = explainer.shap_values(X_encoded, check_additivity=False)
-        if isinstance(shap_values, list):
-            values = np.asarray(shap_values[1])
-        else:
-            values = np.asarray(shap_values)
+        raw = explainer.shap_values(X_encoded, check_additivity=False)
     else:
-        shap_values = explainer.shap_values(X_encoded, silent=True)
-        if isinstance(shap_values, list):
-            values = np.asarray(shap_values[1])
-        else:
-            arr = np.asarray(shap_values)
-            if arr.ndim == 3:
-                values = arr[:, :, 1]
-            else:
-                values = arr
+        raw = explainer.shap_values(X_encoded, silent=True)
 
-    if values.shape[1] != len(feature_names):
+    values = _positive_class_shap(raw, len(feature_names))
+
+    if values.shape[0] != len(X_encoded):
         raise ValueError(
-            f"SHAP values width {values.shape[1]} does not match "
-            f"feature_names length {len(feature_names)}"
+            f"SHAP values cover {values.shape[0]} rows, expected {len(X_encoded)}"
         )
     return values
 
