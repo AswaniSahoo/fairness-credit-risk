@@ -22,7 +22,7 @@ def baseline():
     inputs = load_inputs(
         GERMAN_CREDIT, seed=SEED, test_size=0.2, calibration_size=0.2
     )
-    run, estimator, search = run_baseline_track(
+    run, estimator, search, background = run_baseline_track(
         GERMAN_CREDIT,
         inputs,
         seed=SEED,

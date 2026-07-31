@@ -122,3 +122,70 @@ def test_the_sex_proxy_is_also_refused(predictor: Predictor):
     identifies sex exactly. Finding B5."""
     with pytest.raises(ValueError, match="personal_status_sex"):
         predictor.predict({**SAMPLE_APPLICANT, "personal_status_sex": 1})
+
+
+# --- SHAP reason code tests ---
+
+
+def test_predict_with_reasons_on_decline(predictor: Predictor):
+    """When include_reasons=True and the decision is decline, reason codes must appear."""
+    # Construct an applicant likely to be declined: short duration, large amount, no
+    # checking account, no savings, unemployed.
+    risky = {
+        **SAMPLE_APPLICANT,
+        "status": 3,
+        "savings": 4,
+        "employment_duration": 0,
+        "amount": 18000,
+        "duration": 60,
+        "credit_history": 0,
+    }
+    result = predictor.predict(risky, include_reasons=True)
+
+    if result["decision"] == "decline":
+        assert result["reason_codes"] is not None
+        assert len(result["reason_codes"]) == 4
+        for reason in result["reason_codes"]:
+            assert "feature" in reason
+            assert "shap_value" in reason
+            assert "direction" in reason
+            assert "contribution" in reason
+    else:
+        # If this applicant happens to be approved, reasons should be None.
+        assert result["reason_codes"] is None
+
+
+def test_predict_with_reasons_returns_none_on_approve(predictor: Predictor):
+    """Approved applications do not require adverse-action notices under ECOA."""
+    result = predictor.predict(SAMPLE_APPLICANT, include_reasons=True)
+
+    if result["decision"] == "approve":
+        assert result["reason_codes"] is None
+
+
+def test_predict_without_reasons_has_no_reason_codes(predictor: Predictor):
+    """Default behaviour: no reason_codes key when include_reasons is False."""
+    result = predictor.predict(SAMPLE_APPLICANT)
+
+    assert "reason_codes" not in result
+
+
+def test_explain_always_returns_reasons(predictor: Predictor):
+    """The explain() method returns reasons regardless of decision."""
+    result = predictor.explain(SAMPLE_APPLICANT)
+
+    assert "reason_codes" in result
+    assert result["reason_codes"] is not None
+    assert len(result["reason_codes"]) == 4
+
+
+def test_reason_code_features_are_encoded_names(predictor: Predictor):
+    """Feature names in reason codes must be valid encoded column names."""
+    from src.preprocessing.features import encoded_feature_names
+
+    valid_names = set(encoded_feature_names(predictor._model))
+    result = predictor.explain(SAMPLE_APPLICANT)
+
+    for reason in result["reason_codes"]:
+        assert reason["feature"] in valid_names
+

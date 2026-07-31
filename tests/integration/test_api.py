@@ -178,3 +178,57 @@ def test_api_and_predictor_return_identical_probability(
     direct_prob = direct["probability_of_default"]
 
     assert abs(api_prob - direct_prob) < 1e-9
+
+
+# --- SHAP reason codes ---
+
+
+def test_predict_with_reasons_endpoint(client: TestClient):
+    """POST /predict?include_reasons=true returns reason codes on decline."""
+    # Build a risky applicant likely to be declined.
+    risky = {
+        **SAMPLE_APPLICANT,
+        "status": 3,
+        "savings": 4,
+        "employment_duration": 0,
+        "amount": 18000,
+        "duration": 60,
+        "credit_history": 0,
+    }
+    response = client.post("/predict?include_reasons=true", json=risky)
+    assert response.status_code == 200
+    body = response.json()
+
+    if body["decision"] == "decline":
+        assert body["reason_codes"] is not None
+        assert len(body["reason_codes"]) == 4
+        for reason in body["reason_codes"]:
+            assert "feature" in reason
+            assert "shap_value" in reason
+            assert "direction" in reason
+            assert "contribution" in reason
+    else:
+        assert body["reason_codes"] is None
+
+
+def test_predict_without_reasons_has_no_reason_codes(client: TestClient):
+    """Default /predict does not include reason_codes field."""
+    response = client.post("/predict", json=SAMPLE_APPLICANT)
+    body = response.json()
+
+    assert body.get("reason_codes") is None
+
+
+def test_explain_endpoint(client: TestClient):
+    """POST /explain always returns reason codes regardless of decision."""
+    response = client.post("/explain", json=SAMPLE_APPLICANT)
+    assert response.status_code == 200
+    body = response.json()
+
+    assert "reason_codes" in body
+    assert body["reason_codes"] is not None
+    assert len(body["reason_codes"]) == 4
+    assert body["decision"] in ("approve", "decline")
+    for reason in body["reason_codes"]:
+        assert reason["direction"] in ("increases risk", "decreases risk", "neutral")
+

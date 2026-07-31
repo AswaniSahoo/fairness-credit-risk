@@ -26,7 +26,11 @@ from src.evaluation.explanations import (
     explain_single,
 )
 from src.paths import ARTIFACTS_DIR
-from src.preprocessing.features import encoded_feature_names, extract_features
+from src.preprocessing.features import (
+    encoded_feature_names,
+    extract_features,
+    indicator_feature_names,
+)
 from src.training.search import positive_class_probabilities
 
 logger = logging.getLogger(__name__)
@@ -98,7 +102,7 @@ class Predictor:
 
     def _get_feature_names(self) -> list[str]:
         """Encoded feature names from the fitted pipeline's encoder step."""
-        return encoded_feature_names(self._model)
+        return encoded_feature_names(self._model.named_steps["encoder"])
 
     def predict(
         self,
@@ -195,6 +199,9 @@ class Predictor:
         encoded_arr = np.asarray(encoded, dtype=np.float64)
 
         reasons: list[ReasonCode] = explain_single(
-            explainer, encoded_arr, feature_names
+            explainer,
+            encoded_arr,
+            feature_names,
+            indicator_features=indicator_feature_names(self._model),
         )
         return [reason.as_dict() for reason in reasons]
