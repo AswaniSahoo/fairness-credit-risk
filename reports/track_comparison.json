@@ -19,6 +19,48 @@
         "tpr_privileged": 0.82,
         "tpr_unprivileged": 0.65
       },
+      "feature_importance": [
+        {
+          "feature": "status_3",
+          "mean_abs_shap": 0.05082190537671496
+        },
+        {
+          "feature": "status_0",
+          "mean_abs_shap": 0.034316766007658144
+        },
+        {
+          "feature": "duration",
+          "mean_abs_shap": 0.018581723366888674
+        },
+        {
+          "feature": "purpose_4",
+          "mean_abs_shap": 0.016139082540136785
+        },
+        {
+          "feature": "credit_history_4",
+          "mean_abs_shap": 0.012984029740463846
+        },
+        {
+          "feature": "amount",
+          "mean_abs_shap": 0.012631165619623139
+        },
+        {
+          "feature": "age",
+          "mean_abs_shap": 0.011515214019567186
+        },
+        {
+          "feature": "status_1",
+          "mean_abs_shap": 0.011337400066147325
+        },
+        {
+          "feature": "employment_duration",
+          "mean_abs_shap": 0.010555929646316548
+        },
+        {
+          "feature": "savings_0",
+          "mean_abs_shap": 0.010410773855740822
+        }
+      ],
       "intervals": {
         "balanced_accuracy": {
           "ci_high": 0.7988095238095239,
@@ -134,6 +176,48 @@
         "tpr_privileged": 0.79,
         "tpr_unprivileged": 0.575
       },
+      "feature_importance": [
+        {
+          "feature": "status_3",
+          "mean_abs_shap": 0.05094865403220932
+        },
+        {
+          "feature": "status_0",
+          "mean_abs_shap": 0.03279617674272852
+        },
+        {
+          "feature": "duration",
+          "mean_abs_shap": 0.01841359711978165
+        },
+        {
+          "feature": "purpose_4",
+          "mean_abs_shap": 0.015027795516640172
+        },
+        {
+          "feature": "amount",
+          "mean_abs_shap": 0.012459885820168173
+        },
+        {
+          "feature": "credit_history_4",
+          "mean_abs_shap": 0.012433389127937719
+        },
+        {
+          "feature": "status_1",
+          "mean_abs_shap": 0.0106788540963657
+        },
+        {
+          "feature": "savings_0",
+          "mean_abs_shap": 0.008990867108863527
+        },
+        {
+          "feature": "age",
+          "mean_abs_shap": 0.008172561396909262
+        },
+        {
+          "feature": "other_installment_plans_2",
+          "mean_abs_shap": 0.008055607461847893
+        }
+      ],
       "intervals": {
         "balanced_accuracy": {
           "ci_high": 0.7773809523809524,
@@ -555,6 +639,48 @@
         "tpr_privileged": 0.9655052264808363,
         "tpr_unprivileged": 0.9539656128674432
       },
+      "feature_importance": [
+        {
+          "feature": "PAY_0",
+          "mean_abs_shap": 0.06055425145357109
+        },
+        {
+          "feature": "LIMIT_BAL",
+          "mean_abs_shap": 0.021966746314207673
+        },
+        {
+          "feature": "BILL_AMT1",
+          "mean_abs_shap": 0.012874360275874859
+        },
+        {
+          "feature": "PAY_3",
+          "mean_abs_shap": 0.012073597277778545
+        },
+        {
+          "feature": "PAY_2",
+          "mean_abs_shap": 0.011936635363637534
+        },
+        {
+          "feature": "PAY_AMT1",
+          "mean_abs_shap": 0.009879968022786763
+        },
+        {
+          "feature": "PAY_AMT2",
+          "mean_abs_shap": 0.009746570976675655
+        },
+        {
+          "feature": "PAY_AMT3",
+          "mean_abs_shap": 0.009698981809278282
+        },
+        {
+          "feature": "PAY_4",
+          "mean_abs_shap": 0.007959932653871208
+        },
+        {
+          "feature": "PAY_AMT4",
+          "mean_abs_shap": 0.006999994639380323
+        }
+      ],
       "intervals": {
         "balanced_accuracy": {
           "ci_high": 0.6755920408748747,
@@ -670,6 +796,48 @@
         "tpr_privileged": 0.9655052264808363,
         "tpr_unprivileged": 0.9539656128674432
       },
+      "feature_importance": [
+        {
+          "feature": "PAY_0",
+          "mean_abs_shap": 0.05998875698832985
+        },
+        {
+          "feature": "LIMIT_BAL",
+          "mean_abs_shap": 0.021753041053932356
+        },
+        {
+          "feature": "BILL_AMT1",
+          "mean_abs_shap": 0.012982795348870904
+        },
+        {
+          "feature": "PAY_2",
+          "mean_abs_shap": 0.012176252945450987
+        },
+        {
+          "feature": "PAY_3",
+          "mean_abs_shap": 0.011935236252116843
+        },
+        {
+          "feature": "PAY_AMT2",
+          "mean_abs_shap": 0.009721558710504834
+        },
+        {
+          "feature": "PAY_AMT3",
+          "mean_abs_shap": 0.009672016272959452
+        },
+        {
+          "feature": "PAY_AMT1",
+          "mean_abs_shap": 0.009530211469910212
+        },
+        {
+          "feature": "PAY_4",
+          "mean_abs_shap": 0.007837019038070174
+        },
+        {
+          "feature": "PAY_AMT4",
+          "mean_abs_shap": 0.007022877802812561
+        }
+      ],
       "intervals": {
         "balanced_accuracy": {
           "ci_high": 0.6755975721774512,
