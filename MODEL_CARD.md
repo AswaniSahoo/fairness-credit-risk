@@ -106,10 +106,35 @@ Following ECOA (Equal Credit Opportunity Act) and Regulation B:
 
 The encoder enforces this: prohibited-basis columns cannot enter the pipeline by construction (validated in `DatasetSpec.validate()`).
 
+## Operating Point
+
+The served threshold is chosen, not inherited. 0.5 asserts that approving an applicant who
+defaults costs the same as declining one who would have repaid; in lending it does not, and at
+0.5 the Taiwan baseline catches 36.47 percent of defaults.
+
+- **Selection rule.** The threshold minimising expected misclassification cost at a stated
+  false-negative to false-positive ratio.
+- **Ratio: 5:1. This is an assumption, not a measurement.** Neither dataset records recovery
+  rates or interest margins, so a ratio claiming to be derived from them would be an assumption
+  presented as a measurement. It is swept over 1, 2, 5, 10 and 20 in each run record's
+  `cost_sensitivity` block so a reader can see how much of the result is the assumption.
+- **Fitted on the calibration block, reported on test.** Same discipline as the T3
+  post-processing track and for the same reason (finding B4).
+- **Effect, German Credit T0**: threshold 0.3606, recall 0.7000 to 0.9667, approval rate 0.34.
+  **Taiwan T0**: threshold 0.1899, recall 0.3647 to 0.7272, approval rate 0.6063.
+- **It worsens the fairness metrics.** German Credit disparate impact falls from 0.7263 at 0.5
+  to 0.5261 at the chosen threshold; Taiwan from 0.9767 to 0.9374. Lowering the decline bar
+  moves more applicants into the decline region and the groups are not symmetric around it.
+  Reported here because the trade is real and a card that omitted it would be misleading.
+- **Sanity check.** At a 1:1 ratio the selector returns 0.5368 on Taiwan and 0.5365 on German
+  Credit, which is what threshold 0.5 implicitly assumed all along.
+
 ## Serving Contract
 
-- **One global threshold.** 0.5 for every applicant, read from the run record. There is no
-  group-keyed threshold anywhere in the inference path.
+- **One global threshold, and it is the chosen one.** The served threshold is the operating
+  point above, not 0.5, read from the run record at load time. Responses carry
+  `threshold_basis` naming the rule that produced it. There is no group-keyed threshold
+  anywhere in the inference path.
 - **Prohibited-basis inputs are refused, not ignored.** Supplying `gender`, `foreign_worker` or
   the `personal_status_sex` proxy raises rather than being silently dropped, so a caller cannot
   believe the model considered a factor it must not consider.
@@ -147,6 +172,31 @@ decision and is intended for audit, not for applicant notices.
 - **Global feature importance** in each run record is the mean absolute SHAP value over a
   500-row sample of the training block, not the whole block. It is a diagnostic, not a
   published headline metric; no reported performance or fairness number depends on it.
+
+## Track T4: An Externally Scored Model
+
+Google TabFM, a 1.639-billion-parameter tabular foundation model, is reported as track T4 on
+German Credit. It is **not trained here and not served here**.
+
+- **How it was produced.** The checkpoint was run once on a GPU and its per-row probabilities
+  for this split's test block were recorded, with the checkpoint revision
+  (`google/tabfm-1.0.0-pytorch/classification`), commit, backend, device, `n_estimators` and
+  seed stored beside them. Everything downstream of the scores is the same code the other
+  tracks use.
+- **What is verified.** The loader refuses any prediction file whose row identifiers are not
+  exactly this split's test block, in order. A file with the right row count, columns and
+  value range but shifted identifiers is rejected, and that case is a test.
+- **What is taken on trust.** The scores themselves. T4 cannot be re-derived from this
+  repository without the checkpoint and a GPU.
+- **Result.** ROC-AUC 0.8435 [0.7883, 0.8924] against the tuned booster's 0.8296
+  [0.7725, 0.8804], and disparate impact 0.8321 [0.6801, 0.9845] against 0.7263
+  [0.5342, 0.9106]. Neither difference is distinguishable on a 200-row test block.
+- **Not deployable.** 6.56 GB checkpoint, 0.2662 s per row against 0.000249 s for the booster,
+  and the model holds raw training rows at inference time, which is a data-exposure question a
+  lender must answer before it reaches production.
+- **No operating point.** Selecting one needs calibration-block scores and the offline run
+  produced test-block predictions only. T4 is comparable at a matched selection rate but not
+  at a cost-selected threshold.
 
 ## Second Dataset
 

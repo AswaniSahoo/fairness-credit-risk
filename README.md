@@ -1,11 +1,12 @@
 # Fairness-Aware Credit Risk Scoring
 
-Four fairness interventions, measured against a tuned baseline under identical conditions, on
-two datasets. The interesting result is that none of them helped much, and the reasons why are
-different for each.
+Four fairness interventions and a tabular foundation model, measured against a tuned baseline
+under identical conditions, on two datasets. The interesting result is that none of them helped
+much, and the reasons why are different for each. The decision threshold is chosen by expected
+cost rather than left at 0.5, which turns out to buy a great deal of recall and cost fairness.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-212%20passing-green.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-235%20passing-green.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Every number in this README is generated from [`reports/track_comparison.json`](reports/track_comparison.json)
@@ -19,7 +20,7 @@ artifact at all, which is why that rule now exists and is enforced by a test.
 
 A credit risk model can be unfair in ways that a single accuracy number hides. The standard
 remedies act at three different stages, and the literature reports them working. This project
-implements four tracks that differ **only** in the intervention, and measures what each one
+implements five tracks that differ **only** in the intervention, and measures what each one
 actually buys.
 
 | Track | Intervention | Stage | Deployable |
@@ -28,6 +29,14 @@ actually buys.
 | T1 | Kamiran-Calders reweighing, recomputed per fold | pre-processing | yes |
 | T2 | fairlearn `ExponentiatedGradient`, demographic parity | in-processing | yes, with caveats |
 | T3 | group-specific decision thresholds | post-processing | **no** |
+| T4 | Google TabFM, a tabular foundation model, scored offline | external model | **no** |
+
+T4 is not trained here and not served here. A 6.56 GB checkpoint was run once on a GPU and its
+per-row probabilities for this split's test block were recorded, along with the checkpoint
+revision, backend, device and seed. Everything downstream of those scores is the same code
+every other track uses, and the loader refuses any prediction file whose row identifiers are
+not exactly this split's test block. That check is what separates an external result from a
+number typed into an artifact.
 
 T3 is measured and reported but marked not deployable: keying a credit decision on the
 applicant's sex is disparate treatment under ECOA and Regulation B whatever it does to a
@@ -51,9 +60,17 @@ split artifact, one encoder, one metric implementation, and one set of bootstrap
 | T1 | Kamiran-Calders reweighing | pre-processing | yes | 0.8298 [0.7733, 0.8819] | 0.7143 [0.6464, 0.7774] | 0.6774 [0.4848, 0.8793] | -0.2151 [-0.3537, -0.0755] |
 | T2 | ExponentiatedGradient, demographic parity | in-processing | yes | 0.7357 [0.6679, 0.7988] [*] | 0.7357 [0.6679, 0.7988] | 0.7263 [0.5342, 0.9106] | -0.1884 [-0.3319, -0.0570] |
 | T3 | group-specific thresholds | post-processing | no | 0.8296 [0.7725, 0.8804] | 0.7333 [0.6738, 0.7881] | 0.6583 [0.4336, 0.9032] | -0.1758 [-0.3055, -0.0483] |
+| T4 | tabular foundation model, scored offline | external model | no | 0.8435 [0.7883, 0.8924] | 0.7155 [0.6476, 0.7833] | 0.8321 [0.6801, 0.9845] | -0.1302 [-0.2576, -0.0117] |
 
 [*] T2 emits a decision, not a graded score. Its ROC-AUC equals its balanced accuracy by
 construction, so it is not comparable with the other tracks' ranking quality.
+
+TabFM posts the best ROC-AUC and the best disparate impact, and neither is distinguishable
+from the tuned baseline: 0.8435 against 0.8296 with intervals that overlap heavily, and 0.8321
+against 0.7263 with intervals that both span 0.8. On 200 test rows a 1.4-point AUC difference
+is noise. The honest summary is that a 1.6-billion-parameter foundation model, costing 0.2662 s
+per row against 0.000249 s, did not distinguishably beat a tuned gradient booster on this
+dataset.
 
 ![Fairness-accuracy tradeoff, German Credit](reports/figures/tradeoff_german_credit.png)
 
@@ -205,6 +222,71 @@ comparisons are paired.
 
 ---
 
+## Nobody chose 0.5
+
+A probability model does not make decisions. A threshold does. Every result above is reported
+at 0.5, and 0.5 is not a neutral default: it asserts that approving an applicant who defaults
+costs the same as declining one who would have repaid. In lending it does not. At 0.5 the
+Taiwan baseline catches **36.47 percent of defaults**, which is not an operating point anyone
+would sign off.
+
+So the threshold is now chosen, by minimising expected misclassification cost at a stated
+false-negative to false-positive ratio, fitted on the **calibration** block and reported on
+test. Same discipline as T3's post-processing, and for the same reason (finding B4): a
+threshold picked on the block it is scored on has seen the answer.
+
+<!-- generated from reports/tables/operating_point_taiwan_credit.md -->
+
+**Taiwan**
+
+| Track | Threshold | Approval rate | Recall at 0.5 | Recall at threshold | Disparate impact |
+|---|---|---|---|---|---|
+| T0 | 0.1899 | 0.6063 | 0.3647 | 0.7272 | 0.9374 |
+| T1 | 0.1879 | 0.5995 | 0.3640 | 0.7340 | 0.9414 |
+
+<!-- generated from reports/tables/operating_point_german_credit.md -->
+
+**German Credit**
+
+| Track | Threshold | Approval rate | Recall at 0.5 | Recall at threshold | Disparate impact |
+|---|---|---|---|---|---|
+| T0 | 0.3606 | 0.3400 | 0.7000 | 0.9667 | 0.5261 |
+| T1 | 0.3874 | 0.3950 | 0.7000 | 0.9500 | 0.7048 |
+
+Default capture roughly doubles on Taiwan, 0.3647 to 0.7272, and the approval rate falls from
+0.8890 to 0.6063. That is the trade, stated rather than hidden.
+
+**And it makes fairness worse.** German Credit's disparate impact drops from 0.7263 at 0.5 to
+**0.5261** at the chosen threshold; Taiwan's falls from 0.9767 to 0.9374. Lowering the bar for
+declining pushes more applicants into the decline region, and the groups do not sit
+symmetrically around it. A project optimising for a good-looking fairness number would report
+the 0.5 figure and stop. The two are in tension here, and the tension is the finding.
+
+### The ratio is an assumption, so it is swept
+
+5:1 is a documented choice, not a measurement. Neither dataset records recovery rates or
+interest margins, so any ratio claiming to be derived would be an assumption in a
+measurement's clothing. The sensitivity analysis shows how much of the result is the data and
+how much is the assumption:
+
+| Cost ratio | Threshold | Approval rate | Recall (calibration) |
+|---|---|---|---|
+| 1:1 | 0.5368 | 0.9033 | 0.3135 |
+| 2:1 | 0.3059 | 0.8005 | 0.5177 |
+| 5:1 | 0.1899 | 0.6168 | 0.7136 |
+| 10:1 | 0.1081 | 0.2688 | 0.9194 |
+| 20:1 | 0.0726 | 0.0703 | 0.9902 |
+
+Taiwan T0. The 1:1 row is the check worth reading: symmetric costs select 0.5368, almost
+exactly the 0.5 the project used to inherit. That is what 0.5 was quietly assuming all along,
+and it is evidence the selector does what it claims rather than merely producing a lower
+number.
+
+The served API applies the chosen threshold, not 0.5, and reports which one it used in
+`threshold_basis`. A threshold that is computed and then not applied would be decoration.
+
+---
+
 ## Adverse-action reason codes
 
 Regulation B (12 CFR 1002.9) requires a lender to state the principal reasons for a decline.
@@ -243,8 +325,9 @@ src/
   data/splits.py          the one seeded, fingerprinted three-way split
   preprocessing/          registry-driven encoder, Kamiran-Calders reweighing
   training/search.py      Optuna search over four model families
-  evaluation/             group fairness metrics, bootstrap intervals
-  pipelines/tracks.py     the four tracks, sharing one evaluation path
+  evaluation/             group fairness metrics, bootstrap intervals, SHAP reason codes
+  evaluation/operating_point.py  cost-based threshold selection and its sensitivity sweep
+  pipelines/tracks.py     the five tracks, sharing one evaluation path
   serving/predictor.py    the single inference path
 api/                      FastAPI service (no auth; see below)
 app.py                    Streamlit demo, calls the same predictor
@@ -252,6 +335,7 @@ scripts/
   run_comparison.py       runs the tracks and records results
   generate_report_assets.py  produces every table and figure from the artifact
   verify_german_encoding.py  recovers and checks the dataset's own encoding
+  backfill_shap_background.py  adds SHAP background to artifacts fitted before it existed
 notebooks/
   01_eda_bias_audit.ipynb  dataset-level bias, and where the processed CSV comes from
   prototype_tabfm_comparison.ipynb  foundation-model prototype, not a project result
@@ -276,16 +360,30 @@ retired pipeline and described a composite fairness objective that never existed
 python -m venv .venv && .venv/Scripts/activate      # Windows
 pip install -r requirements.txt -r requirements-dev.txt
 
-pytest -m "unit or integration"                      # 212 tests
+pytest -m "unit or integration"                      # 235 tests
 python scripts/run_comparison.py --dataset german_credit
+python scripts/run_comparison.py --dataset german_credit --tracks T4   # recorded TabFM scores
 python scripts/generate_report_assets.py
 
 uvicorn api.main:app --reload                        # API at :8000/docs
 streamlit run app.py                                 # demo
 ```
 
-The defaults reproduce the published numbers: seed 42, 60 Optuna trials, 5-fold CV, 2,000
-bootstrap replicates. A full four-track run takes about four minutes on German Credit.
+The German Credit defaults reproduce the published numbers: seed 42, 60 Optuna trials, 5-fold
+CV, 2,000 bootstrap replicates, about seven minutes for four tracks. **Taiwan must be run at its
+own recorded budget** or its numbers will not match what is published here:
+
+```bash
+python scripts/run_comparison.py --dataset taiwan_credit \
+    --trials 20 --cv-folds 3 --bootstrap 1000
+```
+
+Re-running both datasets and diffing the artifact against the committed one gives zero drift
+across all nine runs, which is the check behind the claim that these numbers are reproducible
+rather than merely recorded.
+
+T4 needs no GPU here: it reads the probabilities recorded in `notebooks/exchange/` from the one
+GPU run, and refuses them if their row identifiers are not exactly this split's test block.
 
 Docker: `docker-compose up --build -d`.
 
@@ -314,10 +412,23 @@ description and in the module comments rather than being left for a reader to di
 ## Limitations
 
 Stated in full in [MODEL_CARD.md](MODEL_CARD.md). The short version: this is a portfolio
-project, not a lending system. Neither model is calibrated for a real portfolio, the German
-Credit test block is too small for any fairness claim, threshold 0.5 is not an optimised
-operating point (on Taiwan it catches only 36 percent of defaults), and no track was validated
-on data from a different time period than it was trained on.
+project, not a lending system.
+
+- **The cost ratio is an assumption.** 5:1 is a stated choice, swept from 1:1 to 20:1, not a
+  quantity either dataset supports measuring.
+- **Choosing the operating point costs fairness**, and this project raises that trade without
+  resolving it. Resolving it needs a policy input a portfolio repository is not entitled to
+  invent.
+- **German Credit's test block is too small for any fairness claim.** 62 women; every
+  disparate-impact interval spans the 0.8 line.
+- **T4 is German Credit only**, and it carries no operating point: the offline GPU run produced
+  test-block predictions, and selecting a threshold needs calibration-block scores.
+- **No out-of-time validation, and neither dataset can support one.** German Credit is a
+  1973-75 snapshot; Taiwan is a single window (April to September 2005 history, October 2005
+  default), so every row shares one period. This is a property of the data, not a step that was
+  skipped, and a temporal claim here would have to be invented.
+- **Neither model is calibrated for a real portfolio.** Default rates in these datasets have no
+  guaranteed relationship to any current population.
 
 ---
 
