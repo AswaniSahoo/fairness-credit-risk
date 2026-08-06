@@ -278,6 +278,70 @@ def generate_intervals_plot(runs: list[dict[str, Any]], output_path: Path) -> No
     print(f"wrote {output_path}")
 
 
+def generate_operating_point_table(
+    runs: list[dict[str, Any]], output_path: Path
+) -> None:
+    """What choosing the threshold costs and buys, per track.
+
+    The comparison that matters is against 0.5, so both columns are shown. 0.5 is not a
+    baseline anyone selected; it is the point at which approving a defaulter and declining a
+    good applicant are treated as equally expensive.
+    """
+    lines = [
+        "| Track | Threshold | Approval rate | Recall at 0.5 | Recall at threshold | "
+        "Disparate impact |",
+        "|---|---|---|---|---|---|",
+    ]
+    rows = 0
+    for run in runs:
+        point = run.get("operating_point")
+        if point is None:
+            continue
+        test = _require(point, "test")
+        lines.append(
+            f"| {run['track']} | {_fmt(point['threshold'])} | "
+            f"{_fmt(test['selection_rate'])} | "
+            f"{_fmt(run['performance']['recall'])} | "
+            f"{_fmt(test['performance']['recall'])} | "
+            f"{_fmt(test['fairness']['disparate_impact'])} |"
+        )
+        rows += 1
+
+    if rows == 0:
+        return
+
+    first = next(r for r in runs if r.get("operating_point"))
+    ratio = first["operating_point"]["cost_ratio"]
+    lines.append("")
+    lines.append(
+        f"Threshold minimises expected cost at a {ratio:.0f}:1 false-negative to "
+        "false-positive ratio, fitted on the calibration block and reported on test."
+    )
+
+    sensitivity = first.get("cost_sensitivity")
+    if sensitivity:
+        lines.extend([
+            "",
+            "| Cost ratio | Threshold | Approval rate | Recall (calibration) |",
+            "|---|---|---|---|",
+        ])
+        for row in sensitivity:
+            lines.append(
+                f"| {row['cost_ratio']:.0f}:1 | {_fmt(row['threshold'])} | "
+                f"{_fmt(row['selection_rate'])} | {_fmt(row['recall'])} |"
+            )
+        lines.append("")
+        lines.append(
+            "Sensitivity for the control track. A ratio of 1:1 is what threshold 0.5 "
+            "assumes, and it selects a threshold close to 0.5, which is the check that the "
+            "selector is doing what it claims."
+        )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"wrote {output_path}")
+
+
 def datasets_in(artifact: dict[str, Any]) -> list[str]:
     """Dataset names present in the artifact, in stable order.
 
@@ -298,6 +362,7 @@ def main() -> None:
     for dataset in datasets:
         runs = extract_runs(artifact, dataset)
         generate_markdown_table(runs, TABLES_DIR / f"track_comparison_{dataset}.md")
+        generate_operating_point_table(runs, TABLES_DIR / f"operating_point_{dataset}.md")
         generate_tradeoff_plot(runs, FIGURES_DIR / f"tradeoff_{dataset}.png")
         generate_group_rates_plot(runs, FIGURES_DIR / f"group_rates_{dataset}.png")
         generate_intervals_plot(runs, FIGURES_DIR / f"intervals_{dataset}.png")
