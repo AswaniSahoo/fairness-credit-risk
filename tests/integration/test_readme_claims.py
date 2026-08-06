@@ -47,7 +47,14 @@ def test_readme_tables_match_the_generated_tables(readme: str, dataset: str):
         if line.startswith("| T") and "Track" not in line
     ]
 
-    assert len(data_rows) == 4, f"expected four tracks for {dataset}"
+    # Not a fixed count: German Credit carries T4, the offline TabFM track, and Taiwan does
+    # not, because the GPU handoff was only run for German Credit.
+    expected = sum(1 for key in json.loads(
+        (REPORTS_DIR / "track_comparison.json").read_text(encoding="utf-8")
+    )["runs"] if key.startswith(f"{dataset}|"))
+    assert len(data_rows) == expected, (
+        f"generated table for {dataset} has {len(data_rows)} rows, artifact has {expected}"
+    )
     for row in data_rows:
         assert row in readme, f"{dataset} row absent from README: {row}"
 
@@ -58,6 +65,24 @@ def test_every_number_in_a_readme_table_row_exists_in_the_artifact(readme: str, 
     for run in artifact["runs"].values():
         for interval in run["intervals"].values():
             recorded.update(f"{interval[key]:.4f}" for key in ("point", "ci_low", "ci_high"))
+
+        # The operating point table quotes thresholds, approval rates and recalls that are
+        # not interval statistics, so they have to be harvested from their own block or the
+        # check would reject numbers that are in fact recorded.
+        point = run.get("operating_point")
+        if point is not None:
+            recorded.add(f"{point['threshold']:.4f}")
+            recorded.add(f"{point['selection_rate']:.4f}")
+            recorded.add(f"{point['recall']:.4f}")
+            recorded.add(f"{point['test']['selection_rate']:.4f}")
+            for block in ("performance", "fairness"):
+                recorded.update(
+                    f"{value:.4f}" for value in point["test"][block].values()
+                )
+        for row in run.get("cost_sensitivity") or []:
+            recorded.update(
+                f"{row[key]:.4f}" for key in ("threshold", "selection_rate", "recall")
+            )
 
     table_rows = [line for line in readme.splitlines() if line.startswith("| T0 |")]
     assert table_rows, "no result rows found in README"
@@ -141,3 +166,36 @@ def test_dataset_level_claims_recompute_from_the_data(readme: str):
         assert f"{value:.4f}" in readme, (
             f"{value:.4f} is the recomputed dataset-level figure but is absent from the README"
         )
+
+
+@pytest.mark.parametrize("dataset", DATASETS)
+def test_readme_operating_point_rows_match_the_generated_table(readme: str, dataset: str):
+    """The operating point table is under the same rule as every other published number.
+
+    It was added later than the track tables, so without this it would have been the one
+    block in the README that could drift from the artifact unnoticed.
+    """
+    generated_path = TABLES_DIR / f"operating_point_{dataset}.md"
+    assert generated_path.exists(), f"no generated operating point table for {dataset}"
+
+    data_rows = [
+        line.strip()
+        for line in generated_path.read_text(encoding="utf-8").splitlines()
+        if line.startswith("| T") and "Track" not in line
+    ]
+    assert data_rows, f"generated operating point table for {dataset} has no rows"
+
+    for row in data_rows:
+        assert row in readme, f"{dataset} operating point row absent from README: {row}"
+
+
+def test_the_headline_operating_point_claim_traces_to_the_artifact(readme: str, artifact: dict):
+    """The recall figures the README leads with must be the recorded ones."""
+    run = artifact["runs"]["taiwan_credit|T0"]
+    at_default = f"{run['performance']['recall']:.4f}"
+    at_operating_point = f"{run['operating_point']['test']['performance']['recall']:.4f}"
+
+    assert at_default == "0.3647"
+    assert at_operating_point == "0.7272"
+    assert at_default in readme
+    assert at_operating_point in readme
