@@ -20,18 +20,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from config.config import config  # noqa: E402
 from src.data.registry import get_dataset  # noqa: E402
+from src.paths import PROJECT_ROOT  # noqa: E402
 from src.pipelines.tracks import (  # noqa: E402
     TrackRun,
     load_inputs,
     record_run,
     run_baseline_track,
     run_constrained_track,
+    run_offline_predictions_track,
     run_reweighing_track,
     run_threshold_track,
     save_track_model,
 )
 
 logger = logging.getLogger("run_comparison")
+
+# Where the offline GPU handoff leaves its predictions. TabFM is scored elsewhere and its
+# per-row probabilities are read back from here; see run_offline_predictions_track.
+EXCHANGE_DIR = PROJECT_ROOT / "notebooks" / "exchange"
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,7 +50,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--tracks",
         default="T0,T1,T2,T3",
-        help="Comma-separated subset. T2 and T3 require T0 in the same run.",
+        help=(
+            "Comma-separated subset. T2 and T3 require T0 in the same run. T4 reads "
+            "recorded offline predictions and needs no other track."
+        ),
+    )
+    parser.add_argument(
+        "--offline-predictions",
+        type=Path,
+        default=None,
+        help=(
+            "T4 predictions CSV. Defaults to "
+            "notebooks/exchange/tabfm_predictions_<dataset>.csv."
+        ),
+    )
+    parser.add_argument(
+        "--offline-metadata",
+        type=Path,
+        default=None,
+        help="T4 run metadata JSON. Defaults to the matching tabfm_meta_<dataset>.json.",
     )
     return parser.parse_args()
 
@@ -129,6 +153,24 @@ def main() -> int:
             **shared,
         )
         save_track_model(spec, run, postprocessor)
+        record_run(run)
+        report(run)
+
+    if "T4" in wanted:
+        short = spec.name.split("_")[0]
+        predictions = args.offline_predictions or (
+            EXCHANGE_DIR / f"tabfm_predictions_{short}.csv"
+        )
+        metadata = args.offline_metadata or (EXCHANGE_DIR / f"tabfm_meta_{short}.json")
+        run = run_offline_predictions_track(
+            spec,
+            inputs,
+            predictions_path=predictions,
+            metadata_path=metadata,
+            seed=args.seed,
+            n_bootstrap=args.bootstrap,
+            reference_selection_rate=reference_rate,
+        )
         record_run(run)
         report(run)
 

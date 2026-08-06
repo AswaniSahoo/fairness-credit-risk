@@ -68,6 +68,12 @@ from src.evaluation.group_fairness import (
     predict_at_threshold,
     threshold_for_selection_rate,
 )
+from src.evaluation.operating_point import (
+    DEFAULT_COST_RATIO,
+    cost_sensitivity,
+    select_cost_minimising_threshold,
+    threshold_sweep,
+)
 from src.evaluation.performance import (
     bootstrap_interval,
     performance_metrics,
@@ -122,6 +128,9 @@ class TrackRun:
     protected_attribute: str
     n_bootstrap: int
     feature_importance: list[dict[str, Any]] | None
+    operating_point: dict[str, Any] | None
+    cost_sensitivity: list[dict[str, float]] | None
+    threshold_sweep: list[dict[str, float]] | None
     provenance: str
     recorded_at: str = field(
         default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds")
@@ -136,6 +145,7 @@ class TrackRun:
                 "selection_rate", "split_sizes", "split_fingerprint",
                 "n_encoded_features", "model", "performance", "fairness", "intervals",
                 "matched", "protected_attribute", "n_bootstrap", "feature_importance",
+                "operating_point", "cost_sensitivity", "threshold_sweep",
                 "provenance", "recorded_at",
             )
         }
@@ -243,6 +253,9 @@ def _assemble_run(
     threshold: float | None,
     reference_selection_rate: float | None,
     feature_importance: list[dict[str, Any]] | None = None,
+    operating_point: dict[str, Any] | None = None,
+    cost_sensitivity_rows: list[dict[str, float]] | None = None,
+    threshold_sweep_rows: list[dict[str, float]] | None = None,
 ) -> TrackRun:
     """Build a run record. Every track goes through this function, and only this function."""
     performance = performance_metrics(y_true, y_pred, scores, positive_class=POSITIVE_CLASS)
@@ -285,6 +298,9 @@ def _assemble_run(
         protected_attribute=spec.protected_attribute().column,
         n_bootstrap=n_bootstrap,
         feature_importance=feature_importance,
+        operating_point=operating_point,
+        cost_sensitivity=cost_sensitivity_rows,
+        threshold_sweep=threshold_sweep_rows,
         provenance=spec.provenance,
     )
 
@@ -334,6 +350,120 @@ def load_inputs(
         y_test=extract_target(spec, blocks["test"]),
         groups_test=extract_groups(spec, blocks["test"]),
     )
+
+
+def _sweep_rows(
+    spec: DatasetSpec,
+    y_test: NDArray[np.int_],
+    scores: NDArray[np.float64],
+    groups: NDArray[Any],
+) -> list[dict[str, float]]:
+    """Threshold sweep on the test block, for the fairness-accuracy tradeoff curve.
+
+    Descriptive only. Nothing is selected here; the operating point is chosen on
+    calibration. Reporting the curve on test is what makes it comparable with the
+    published test-block metrics.
+    """
+    return threshold_sweep(
+        y_test,
+        scores,
+        groups,
+        favorable_label=spec.favorable_label,
+        positive_class=POSITIVE_CLASS,
+        fairness_fn=lambda yt, yp, g: _fairness(spec, yt, yp, g),
+    )
+
+
+def operating_point_from_scores(
+    spec: DatasetSpec,
+    *,
+    y_calibration: NDArray[np.int_],
+    scores_calibration: NDArray[np.float64],
+    y_test: NDArray[np.int_],
+    scores_test: NDArray[np.float64],
+    groups_test: NDArray[Any],
+    cost_ratio: float = DEFAULT_COST_RATIO,
+) -> tuple[dict[str, Any], list[dict[str, float]]]:
+    """Select a threshold on calibration, then report its consequences on test.
+
+    Threshold 0.5 is not a neutral choice: it asserts that approving a defaulter and
+    declining a good applicant cost the same. This picks the threshold that minimises
+    expected cost at ``cost_ratio`` instead, on the calibration block, and evaluates it on
+    test. The 0.5 metrics stay in the run record beside it, because the comparison between
+    the two is the point.
+
+    Returns:
+        A tuple of (operating point record including its test-block metrics, cost
+        sensitivity rows).
+    """
+    point = select_cost_minimising_threshold(
+        y_calibration,
+        scores_calibration,
+        cost_ratio=cost_ratio,
+        favorable_label=spec.favorable_label,
+        positive_class=POSITIVE_CLASS,
+        fitted_on="calibration",
+    )
+
+    y_pred = predict_at_threshold(
+        scores_test, point.threshold, favorable_label=spec.favorable_label
+    )
+    performance = performance_metrics(
+        y_test, y_pred, scores_test, positive_class=POSITIVE_CLASS
+    )
+    fairness = _fairness(spec, y_test, y_pred, groups_test)
+
+    record = {
+        **point.as_dict(),
+        "test": {
+            "selection_rate": float(np.mean(y_pred == spec.favorable_label)),
+            "performance": performance,
+            "fairness": fairness.as_dict(),
+        },
+    }
+    sensitivity = cost_sensitivity(
+        y_calibration,
+        scores_calibration,
+        favorable_label=spec.favorable_label,
+        positive_class=POSITIVE_CLASS,
+    )
+    logger.info(
+        "%s operating point: threshold %.4f (from %.1f), test recall %.4f against %.4f "
+        "at 0.5",
+        spec.name, point.threshold, cost_ratio, performance["recall"],
+        performance_metrics(
+            y_test,
+            predict_at_threshold(
+                scores_test, DEFAULT_THRESHOLD, favorable_label=spec.favorable_label
+            ),
+            scores_test,
+            positive_class=POSITIVE_CLASS,
+        )["recall"],
+    )
+    return record, sensitivity
+
+
+def compute_operating_point(
+    spec: DatasetSpec,
+    estimator: Any,
+    inputs: TrackInputs,
+    scores_test: NDArray[np.float64],
+    *,
+    cost_ratio: float = DEFAULT_COST_RATIO,
+) -> tuple[dict[str, Any], list[dict[str, float]], list[dict[str, float]]]:
+    """Operating point, cost sensitivity and threshold sweep for a scoring estimator."""
+    scores_calibration = positive_class_probabilities(estimator, inputs.X_calibration)
+    record, sensitivity = operating_point_from_scores(
+        spec,
+        y_calibration=inputs.y_calibration,
+        scores_calibration=scores_calibration,
+        y_test=inputs.y_test,
+        scores_test=scores_test,
+        groups_test=inputs.groups_test,
+        cost_ratio=cost_ratio,
+    )
+    sweep = _sweep_rows(spec, inputs.y_test, scores_test, inputs.groups_test)
+    return record, sensitivity, sweep
 
 
 def compute_shap_importance(
@@ -399,6 +529,9 @@ def run_baseline_track(
     y_pred = predict_at_threshold(scores, threshold, favorable_label=spec.favorable_label)
 
     importance, background = compute_shap_importance(estimator, inputs.X_train, seed)
+    operating_point, sensitivity, sweep = compute_operating_point(
+        spec, estimator, inputs, scores
+    )
 
     run = _assemble_run(
         spec,
@@ -428,6 +561,9 @@ def run_baseline_track(
         threshold=threshold,
         reference_selection_rate=None,
         feature_importance=importance,
+        operating_point=operating_point,
+        cost_sensitivity_rows=sensitivity,
+        threshold_sweep_rows=sweep,
     )
     return run, estimator, search, background
 
@@ -473,6 +609,9 @@ def run_reweighing_track(
     y_pred = predict_at_threshold(scores, threshold, favorable_label=spec.favorable_label)
 
     importance, background = compute_shap_importance(estimator, inputs.X_train, seed)
+    operating_point, sensitivity, sweep = compute_operating_point(
+        spec, estimator, inputs, scores
+    )
 
     weights = reweighing_weights(inputs.y_train, inputs.groups_train)
     summary = {
@@ -508,6 +647,9 @@ def run_reweighing_track(
         threshold=threshold,
         reference_selection_rate=reference_selection_rate,
         feature_importance=importance,
+        operating_point=operating_point,
+        cost_sensitivity_rows=sensitivity,
+        threshold_sweep_rows=sweep,
     )
     return run, estimator, search, background
 
@@ -859,6 +1001,151 @@ def run_threshold_track(
         feature_importance=None,
     )
     return run, postprocessor
+
+
+def load_offline_predictions(
+    predictions_path: Path,
+    split: DataSplit,
+) -> NDArray[np.float64]:
+    """Read recorded predictions and prove they are for this split's test block.
+
+    A track that reads predictions from a file cannot verify them by re-running the model, so
+    the one thing it can verify is that they describe the right rows. The prediction file
+    carries the dataframe row positions it was produced from; those must equal the split's
+    test block exactly and in order. Anything else, including a file that merely has the right
+    number of rows, is refused.
+
+    This check is the difference between an external result and an unfalsifiable number typed
+    into an artifact.
+
+    Raises:
+        FileNotFoundError: If the predictions file is absent.
+        ValueError: If the row identifiers do not match the split's test block.
+    """
+    if not predictions_path.exists():
+        raise FileNotFoundError(
+            f"no offline predictions at {predictions_path}. Produce them with the Colab "
+            "staging notebook before running this track."
+        )
+
+    frame = pd.read_csv(predictions_path)
+    for column in ("__row_id", "proba_default"):
+        if column not in frame.columns:
+            raise ValueError(
+                f"{predictions_path} lacks column {column!r}; found {list(frame.columns)}"
+            )
+
+    recorded = frame["__row_id"].to_numpy()
+    expected = np.asarray(split.test)
+    if len(recorded) != len(expected):
+        raise ValueError(
+            f"{predictions_path} holds {len(recorded)} rows, the test block has "
+            f"{len(expected)}"
+        )
+    if not np.array_equal(recorded, expected):
+        raise ValueError(
+            f"{predictions_path} row identifiers do not match the test block of split "
+            f"{split.fingerprint}. The predictions describe different applicants."
+        )
+
+    scores = frame["proba_default"].to_numpy(dtype=np.float64)
+    if not np.all((scores >= 0.0) & (scores <= 1.0)):
+        raise ValueError(
+            f"{predictions_path} holds values outside [0, 1]; these must be probabilities "
+            "of default"
+        )
+    return scores
+
+
+def run_offline_predictions_track(
+    spec: DatasetSpec,
+    inputs: TrackInputs,
+    *,
+    predictions_path: Path,
+    metadata_path: Path,
+    seed: int,
+    n_bootstrap: int,
+    track: str = "T4",
+    threshold: float = DEFAULT_THRESHOLD,
+    reference_selection_rate: float | None = None,
+) -> TrackRun:
+    """T4: an externally scored model, evaluated through this repository's own metric path.
+
+    TabFM is a 6.56 GB checkpoint that does no training and instead carries the training rows
+    as context at inference. It is not served here and it is not re-run here: it was run once
+    on a GPU, and its per-row probabilities for this split's test block were recorded, along
+    with the checkpoint revision, backend, device and seed that produced them.
+
+    What makes the comparison honest is that nothing downstream of the scores differs. The
+    same bootstrap replicates, the same fairness implementation, the same matched-selection
+    rate block, the same run record. The only thing taken on trust is the scores themselves,
+    and `load_offline_predictions` refuses any file that is not about these exact applicants.
+
+    No cost-based operating point is recorded. Selecting one requires calibration-block
+    scores, and the offline run produced predictions for the test block only. T4 is therefore
+    comparable at a matched selection rate but not at a cost-selected threshold; re-running
+    the handoff over the calibration block would remove that limitation.
+    """
+    metadata: dict[str, Any] = {}
+    if metadata_path.exists():
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    else:
+        logger.warning("no run metadata at %s; provenance will be incomplete", metadata_path)
+
+    scores = load_offline_predictions(predictions_path, inputs.split)
+    y_pred = predict_at_threshold(scores, threshold, favorable_label=spec.favorable_label)
+
+    logger.info(
+        "%s %s: %d recorded predictions verified against split %s",
+        spec.name, track, len(scores), inputs.split.fingerprint,
+    )
+
+    return _assemble_run(
+        spec,
+        inputs.split,
+        track=track,
+        intervention="tabular foundation model, scored offline",
+        stage="external model",
+        description=(
+            "Google TabFM scored offline on a GPU and its per-row probabilities recorded. "
+            "It fits nothing: the training block is supplied as in-context rows at inference "
+            "time. Evaluated through the same metric, bootstrap and fairness path as every "
+            "other track, against the same test block."
+        ),
+        deployable=False,
+        deployability_note=(
+            "Not deployable here. The checkpoint is 6.56 GB, inference costs 0.2662 s per "
+            "row against 0.000249 s for the tuned booster, and the model holds raw training "
+            "rows at inference time, which is a data-exposure question a lender must answer "
+            "before it reaches production."
+        ),
+        search_note=(
+            "No search. TabFM has no hyperparameters fitted here; the recorded run used "
+            f"n_estimators {metadata.get('n_estimators', 'unrecorded')} and random_state "
+            f"{metadata.get('random_state', 'unrecorded')}."
+        ),
+        model_summary={
+            "model_type": metadata.get("checkpoint", "unrecorded"),
+            "params": metadata,
+            "scored_offline": True,
+            "predictions_file": predictions_path.name,
+        },
+        n_encoded_features=len(spec.feature_columns),
+        y_true=inputs.y_test,
+        y_pred=y_pred,
+        scores=scores,
+        groups=inputs.groups_test,
+        seed=seed,
+        n_bootstrap=n_bootstrap,
+        threshold=threshold,
+        reference_selection_rate=reference_selection_rate,
+        feature_importance=None,
+        operating_point=None,
+        cost_sensitivity_rows=None,
+        threshold_sweep_rows=_sweep_rows(
+            spec, inputs.y_test, scores, inputs.groups_test
+        ),
+    )
 
 
 def save_track_model(
