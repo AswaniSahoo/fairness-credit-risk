@@ -62,10 +62,24 @@ def test_decision_is_consistent_with_threshold(predictor: Predictor):
         assert result["decision"] == "approve"
 
 
-def test_threshold_matches_run_record(predictor: Predictor):
-    result = predictor.predict(SAMPLE_APPLICANT)
+def test_served_threshold_is_the_chosen_operating_point(predictor: Predictor):
+    """Serving must apply the cost-selected threshold, not the nominal 0.5.
 
-    assert result["threshold"] == predictor.run["threshold"]
+    The run record carries both: 0.5, at which every track is scored for comparison, and
+    the operating point chosen on the calibration block. A model that reports a chosen
+    threshold and then decides at 0.5 has not chosen anything.
+    """
+    result = predictor.predict(SAMPLE_APPLICANT)
+    operating_point = predictor.run.get("operating_point")
+
+    if operating_point is None:
+        assert result["threshold"] == predictor.run["threshold"]
+        assert "no operating point" in result["threshold_basis"]
+    else:
+        assert result["threshold"] == pytest.approx(operating_point["threshold"])
+        assert result["threshold"] != pytest.approx(0.5)
+        assert "cost-minimising" in result["threshold_basis"]
+        assert str(int(operating_point["cost_ratio"])) in result["threshold_basis"]
 
 
 def test_track_and_dataset_match_run(predictor: Predictor):

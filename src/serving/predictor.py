@@ -65,15 +65,33 @@ class Predictor:
         artifact = joblib.load(self._path)
         self._model = artifact["model"]
         self._run: dict[str, Any] = artifact["run"]
-        self._threshold: float = self._run["threshold"]
         self._background = artifact.get("background")
         self._explainer: Any | None = None
 
+        # Serve the threshold the run record chose, not the 0.5 it was scored at for
+        # comparison. A cost-minimising point that is computed and then not applied would be
+        # decoration; the whole argument for choosing an operating point is that decisions
+        # are made at it. The nominal figure stays in the run record beside it.
+        operating_point = self._run.get("operating_point")
+        if operating_point is not None:
+            self._threshold = float(operating_point["threshold"])
+            self._threshold_basis = (
+                f"cost-minimising at a {operating_point['cost_ratio']:.0f}:1 "
+                f"false-negative to false-positive ratio, fitted on "
+                f"{operating_point['fitted_on']}"
+            )
+        else:
+            self._threshold = float(self._run["threshold"])
+            self._threshold_basis = (
+                "nominal, no operating point recorded for this track"
+            )
+
         logger.info(
-            "loaded %s track %s, threshold %.4f",
+            "loaded %s track %s, threshold %.4f (%s)",
             self._run["dataset"],
             self._run["track"],
             self._threshold,
+            self._threshold_basis,
         )
 
     @property
@@ -83,6 +101,11 @@ class Predictor:
     @property
     def threshold(self) -> float:
         return self._threshold
+
+    @property
+    def threshold_basis(self) -> str:
+        """Why the served threshold has the value it has."""
+        return self._threshold_basis
 
     @property
     def spec(self) -> DatasetSpec:
@@ -148,6 +171,7 @@ class Predictor:
             "probability_of_default": probability,
             "decision": decision,
             "threshold": self._threshold,
+            "threshold_basis": self._threshold_basis,
             "track": self._run["track"],
             "dataset": self._run["dataset"],
         }
@@ -184,6 +208,7 @@ class Predictor:
             "probability_of_default": probability,
             "decision": decision,
             "threshold": self._threshold,
+            "threshold_basis": self._threshold_basis,
             "track": self._run["track"],
             "dataset": self._run["dataset"],
             "reason_codes": self._compute_reasons(features),
