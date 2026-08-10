@@ -17,6 +17,7 @@ packages = ["src", "api", "config"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+exclude = ["notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "PTH", "RET", "ARG", "T20"]
@@ -43,6 +44,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "--strict-markers"
 markers = [
     "unit: no I/O, milliseconds",
